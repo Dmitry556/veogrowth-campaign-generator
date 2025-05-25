@@ -364,18 +364,125 @@ async function sendEmailReport(email, analysis, company) {
   }
 }
 
-// Main API handler
 export async function POST(req) {
+  console.log('=== API CALLED ===');
+  
   try {
-    const { email, website, positioning } = await req.json();
+    // Step 1: Parse request
+    const body = await req.json();
+    console.log('Request body:', body);
+    const { email, website, positioning } = body;
     
-    // Validate inputs
+    // Step 2: Validate
     if (!email || !website || !positioning) {
+      console.error('Missing fields:', { email: !!email, website: !!website, positioning: !!positioning });
       return Response.json({ 
         success: false, 
         error: 'Missing required fields' 
       }, { status: 400 });
     }
+    
+    // Step 3: Check API key
+    console.log('API Key exists:', !!process.env.ANTHROPIC_API_KEY);
+    console.log('API Key first 10 chars:', process.env.ANTHROPIC_API_KEY?.substring(0, 10));
+    
+    // Step 4: Test basic Claude call first
+    console.log('Testing basic Claude call...');
+    try {
+      const testMessage = await anthropic.messages.create({
+        model: 'claude-opus-4-20250514',
+        max_tokens: 100,
+        messages: [
+          {
+            role: 'user',
+            content: 'Say hello'
+          }
+        ]
+      });
+      console.log('Basic Claude test SUCCESS:', testMessage.content[0].text);
+    } catch (testError) {
+      console.error('Basic Claude test FAILED:', testError);
+      return Response.json({ 
+        success: false, 
+        error: `Claude API test failed: ${testError.message}` 
+      }, { status: 500 });
+    }
+    
+    // Step 5: Try with web search
+    console.log('Attempting web search call...');
+    const prompt = METAPROMPT
+      .replace('{website}', website)
+      .replace('{positioning}', positioning);
+    
+    console.log('Prompt length:', prompt.length);
+    
+    try {
+      const message = await anthropic.messages.create({
+        model: 'claude-opus-4-20250514',
+        max_tokens: 4000,
+        temperature: 0.7,
+        system: "You are VeoGrowth's AI strategist with access to web search. Use the web_search tool to analyze websites.",
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        tools: [
+          {
+            type: 'web_search_20250305',
+            name: 'web_search',
+            max_uses: 5
+          }
+        ]
+      });
+      
+      console.log('Claude response received');
+      console.log('Stop reason:', message.stop_reason);
+      console.log('Content blocks:', message.content.length);
+      console.log('First content type:', message.content[0]?.type);
+      
+      // Extract analysis
+      const analysis = message.content[0].text;
+      console.log('Analysis extracted, length:', analysis?.length);
+      
+      // Extract company name
+      const company = website
+        .replace(/https?:\/\//, '')
+        .replace('www.', '')
+        .split('/')[0];
+      
+      console.log('SUCCESS - returning analysis');
+      
+      return Response.json({
+        success: true,
+        data: {
+          company,
+          positioning,
+          analysis
+        }
+      });
+      
+    } catch (claudeError) {
+      console.error('Claude web search FAILED:', claudeError);
+      console.error('Full error:', JSON.stringify(claudeError, null, 2));
+      
+      return Response.json({ 
+        success: false, 
+        error: `Claude error: ${claudeError.message}` 
+      }, { status: 500 });
+    }
+    
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    console.error('Stack:', error.stack);
+    
+    return Response.json({ 
+      success: false, 
+      error: `Unexpected error: ${error.message}` 
+    }, { status: 500 });
+  }
+}
     
     // Save lead to database
     await saveLeadToDatabase(email, website, positioning);
