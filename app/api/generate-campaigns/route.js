@@ -390,7 +390,7 @@ export async function POST(req) {
       model: 'claude-opus-4-20250514',
       max_tokens: 4000,
       temperature: 0.7,
-      system: "You have access to web_search and web_fetch tools to analyze websites.",
+      system: "You are VeoGrowth's AI strategist with access to web search. Use the web_search tool to analyze websites and find case studies.",
       messages: [
         {
           role: 'user',
