@@ -132,7 +132,7 @@ IXON has excellent positioning as an Industrial IoT platform specifically for ma
 **Target**: CTOs at machine builders selling to automotive/pharma
 
 **Example email:**
-"Hi Sarah, supplying assembly systems to automotive plants means facilities demand NIS2 and ISO compliance for any remote access. Most VPN solutions create security nightmares. IXON provides bank-grade security that IT departments actually approve. Vapormatt implemented without a single security audit finding. Interested?"`;
+"Hi Sarah, supplying assembly systems to automotive plants means facilities demand NIS2 and ISO compliance for any remote access. Most VPN solutions create security nightmares. IXON provides bank-grade security that IT departments actually approve. Vapormatt implemented without a single security audit finding. Interested?"
 ### **Campaign 3: "First-Time Fix Rate Booster"**
 **Target**: Field Service Managers with global installations
 
