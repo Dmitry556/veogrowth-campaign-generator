@@ -423,8 +423,33 @@ export async function POST(req) {
       ]
     });
     
-    // Extract the analysis from Claude's response
-    const analysis = message.content[0].text;
+// Extract the analysis from Claude's response
+let analysis = '';
+
+// Check if Claude used tools
+if (message.stop_reason === 'tool_use') {
+  // Claude needs to continue after using tools
+  const toolResults = message.content.filter(c => c.type === 'tool_use').map(toolUse => ({
+    tool_use_id: toolUse.id,
+    content: 'Tool executed successfully'
+  }));
+  
+  // Continue the conversation to get final response
+  const finalMessage = await anthropic.messages.create({
+    model: 'claude-opus-4-20250514',
+    max_tokens: 4000,
+    temperature: 0.7,
+    messages: [
+      { role: 'user', content: prompt },
+      { role: 'assistant', content: message.content },
+      { role: 'user', content: toolResults }
+    ]
+  });
+  
+  analysis = finalMessage.content[0].text;
+} else {
+  analysis = message.content[0].text;
+}
     
     // Extract company name from URL
     const company = website
