@@ -4,32 +4,26 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-// Simple metaprompt for testing
-const METAPROMPT = `You are VeoGrowth's AI strategist. Analyze the website and provide campaign ideas.`;
-
 export async function POST(req) {
   console.log('=== API CALLED ===');
   
   try {
-    // Step 1: Parse request
     const body = await req.json();
     console.log('Request body:', body);
     const { email, website, positioning } = body;
     
-    // Step 2: Validate
     if (!email || !website || !positioning) {
-      console.error('Missing fields:', { email: !!email, website: !!website, positioning: !!positioning });
+      console.error('Missing fields');
       return Response.json({ 
         success: false, 
         error: 'Missing required fields' 
       }, { status: 400 });
     }
     
-    // Step 3: Check API key
     console.log('API Key exists:', !!process.env.ANTHROPIC_API_KEY);
     console.log('API Key first 10 chars:', process.env.ANTHROPIC_API_KEY?.substring(0, 10));
     
-    // Step 4: Test basic Claude call first
+    // Test basic Claude first
     console.log('Testing basic Claude call...');
     try {
       const testMessage = await anthropic.messages.create({
@@ -42,7 +36,7 @@ export async function POST(req) {
           }
         ]
       });
-      console.log('Basic Claude test SUCCESS:', testMessage.content[0].text);
+      console.log('Basic Claude test SUCCESS');
     } catch (testError) {
       console.error('Basic Claude test FAILED:', testError);
       return Response.json({ 
@@ -51,7 +45,7 @@ export async function POST(req) {
       }, { status: 500 });
     }
     
-  // Step 5: Analysis with web search
+    // Now try with web search
     console.log('Generating analysis with web search...');
     
     try {
@@ -67,10 +61,12 @@ export async function POST(req) {
             First, search for and analyze their website. Then search for "${website.replace(/https?:\/\//, '').replace('www.', '')} case studies" or testimonials.
             
             Create a comprehensive analysis with:
-            1. Positioning Assessment
-            2. ICP definition
-            3. Key Personas
-            4. 3 specific campaign ideas with example emails
+            1. Positioning Assessment (Clear/Unclear/Moderately Clear)
+            2. ICP definition (industry, company size, characteristics)
+            3. Key Personas to target
+            4. 3 specific campaign ideas with example emails under 70 words each
+            
+            Format the response in clean HTML with proper headings.
             
             The user indicated their positioning is: ${positioning === 'yes' ? 'clear' : positioning === 'no' ? 'unclear' : 'unsure'}`
           }
@@ -85,9 +81,10 @@ export async function POST(req) {
       });
       
       console.log('Claude response received');
-      console.log('Tool use:', message.stop_reason);
+      console.log('Stop reason:', message.stop_reason);
+      console.log('Content blocks:', message.content.length);
       
-      // Get the final text from Claude's response
+      // Extract text from response
       let analysis = '';
       for (const content of message.content) {
         if (content.type === 'text') {
@@ -96,3 +93,43 @@ export async function POST(req) {
       }
       
       console.log('Analysis length:', analysis.length);
+      
+      const company = website
+        .replace(/https?:\/\//, '')
+        .replace('www.', '')
+        .split('/')[0];
+      
+      console.log('SUCCESS - returning analysis');
+      
+      return Response.json({
+        success: true,
+        data: {
+          company,
+          positioning,
+          analysis: `<div class="prose max-w-none">${analysis}</div>`
+        }
+      });
+      
+    } catch (claudeError) {
+      console.error('Claude web search FAILED:', claudeError);
+      console.error('Error details:', claudeError.message);
+      return Response.json({ 
+        success: false, 
+        error: `Claude error: ${claudeError.message}` 
+      }, { status: 500 });
+    }
+    
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    return Response.json({ 
+      success: false, 
+      error: `Unexpected error: ${error.message}` 
+    }, { status: 500 });
+  }
+}
+
+export async function GET() {
+  return Response.json({ 
+    message: 'VeoGrowth API is running with web search!' 
+  });
+}
