@@ -360,190 +360,46 @@ export async function POST(req) {
       .replace('www.', '')
       .split('/')[0];
     
-    // Format the response with clean HTML
-    let cleanAnalysis = analysis
-      // Remove all asterisks first
-      .replace(/\*\*/g, '')
-      // Convert headers
-      .replace(/## Positioning Assessment: (.+)/g, '<div class="positioning-section"><h3>Positioning Assessment: $1</h3></div>')
-      .replace(/## Your ICP appears to be:/g, '<div class="icp-section"><h3>Your ICP appears to be:</h3>')
-      .replace(/## Key Personas to Target:/g, '</div><div class="personas-section"><h3>Key Personas to Target:</h3>')
-      .replace(/## Campaign Ideas for .+:/g, '</div><div class="campaigns-section"><h3>Campaign Ideas:</h3>')
-      // Convert campaign cards
-      .replace(/### Campaign (\d+): "(.+)"/g, function(match, num, name) {
-        return `</div><div class="campaign-card"><h4>Campaign ${num}: "${name}"</h4>`;
-      })
-      // Convert Target and Example email
-      .replace(/Target: (.+)/g, '<p class="target"><strong>Target:</strong> $1</p>')
-      .replace(/Example email:/g, '<p class="email-label"><strong>Example email:</strong></p>')
-      // Convert email content
-      .replace(/"([^"]+)"/g, '<div class="email-example">"$1"</div>')
-      // Convert lists
-      .replace(/^- (.+)$/gm, '<li>$1</li>')
-      .replace(/---/g, '<hr>')
-      // Handle social proof note
-      .replace(/### ⚠️ Note on Social Proof:/g, '</div><div class="warning-note"><h4>⚠️ Note on Social Proof:</h4>')
-      .replace(/Want VeoGrowth to execute these campaigns\?/g, '</div><div class="final-cta"><h3>Want VeoGrowth to execute these campaigns?</h3>');
-    
-    // Wrap lists in ul tags
-    cleanAnalysis = cleanAnalysis.replace(/(<li>.*<\/li>\s*)+/g, function(match) {
-      return '<ul>' + match + '</ul>';
-    });
-    
-    // Close any open divs
-    cleanAnalysis += '</div>';
-    
+    // Format the response nicely with proper HTML
     const formattedAnalysis = `
-      <style>
-        .campaign-analysis {
-          max-width: 900px;
-          margin: 0 auto;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          line-height: 1.6;
-          color: #1f2937;
-        }
-        .campaign-analysis h2 {
-          color: #1f2937;
-          margin-bottom: 2rem;
-          font-size: 2rem;
-          font-weight: 700;
-          text-align: center;
-        }
-        .campaign-analysis h3 {
-          color: #4f46e5;
-          margin: 2rem 0 1rem 0;
-          font-size: 1.5rem;
-          font-weight: 600;
-        }
-        .campaign-analysis h4 {
-          color: #1f2937;
-          margin: 1.5rem 0 1rem 0;
-          font-size: 1.25rem;
-          font-weight: 600;
-        }
-        .content-wrapper {
-          background: #ffffff;
-          padding: 2.5rem;
-          border-radius: 12px;
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
-        }
-        .positioning-section {
-          background: #f0f9ff;
-          padding: 1.5rem;
-          border-radius: 8px;
-          margin-bottom: 2rem;
-          border-left: 4px solid #3b82f6;
-        }
-        .positioning-section h3 {
-          margin-top: 0;
-        }
-        .icp-section, .personas-section {
-          margin: 2rem 0;
-        }
-        .campaign-card {
-          background: #f9fafb;
-          padding: 1.5rem;
-          border-radius: 8px;
-          margin: 1.5rem 0;
-          border: 1px solid #e5e7eb;
-        }
-        .campaign-card h4 {
-          margin-top: 0;
-          color: #7c3aed;
-        }
-        .target {
-          margin: 1rem 0 0.5rem 0;
-          font-size: 0.95rem;
-        }
-        .email-label {
-          margin: 1rem 0 0.5rem 0;
-          font-weight: 600;
-        }
-        .email-example {
-          background: #ffffff;
-          padding: 1.25rem;
-          border-left: 4px solid #4f46e5;
-          margin: 0.5rem 0;
-          font-style: italic;
-          color: #4b5563;
-          border-radius: 4px;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-        }
-        .campaign-analysis ul {
-          margin: 1rem 0;
-          padding-left: 1.5rem;
-        }
-        .campaign-analysis li {
-          margin: 0.5rem 0;
-          color: #4b5563;
-        }
-        .campaign-analysis hr {
-          border: none;
-          border-top: 1px solid #e5e7eb;
-          margin: 2rem 0;
-        }
-        .warning-note {
-          background: #fef3c7;
-          border: 1px solid #fbbf24;
-          padding: 1.5rem;
-          border-radius: 8px;
-          margin: 2rem 0;
-        }
-        .warning-note h4 {
-          color: #92400e;
-          margin-top: 0;
-        }
-        .final-cta {
-          margin-top: 2rem;
-          text-align: center;
-        }
-        .cta-box {
-          margin-top: 3rem;
-          padding: 2.5rem;
-          background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-          color: white;
-          border-radius: 12px;
-          text-align: center;
-        }
-        .cta-box h3 {
-          color: white;
-          margin-bottom: 1rem;
-          font-size: 1.75rem;
-        }
-        .cta-box p {
-          margin-bottom: 1.5rem;
-          font-size: 1.1rem;
-          opacity: 0.95;
-        }
-        .cta-button {
-          display: inline-block;
-          background: white;
-          color: #4f46e5;
-          padding: 1rem 2.5rem;
-          border-radius: 8px;
-          text-decoration: none;
-          font-weight: 600;
-          font-size: 1.1rem;
-          transition: all 0.3s ease;
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        .cta-button:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-        }
-      </style>
-      
-      <div class="campaign-analysis">
-        <h2>Campaign Analysis for ${company}</h2>
+      <div style="max-width: 800px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <h2 style="color: #1f2937; margin-bottom: 32px; font-size: 28px; font-weight: 700;">
+          Campaign Analysis for ${company}
+        </h2>
         
-        <div class="content-wrapper">
-          ${cleanAnalysis}
+        <div style="background: #ffffff; padding: 32px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          ${analysis
+            .replace(/## \*\*Positioning Assessment:/g, '<h3 style="color: #4f46e5; margin: 24px 0 16px 0; font-size: 20px; font-weight: 600;">Positioning Assessment:')
+            .replace(/## \*\*Your ICP appears to be:\*\*/g, '<h3 style="color: #4f46e5; margin: 32px 0 16px 0; font-size: 20px; font-weight: 600;">Your ICP appears to be:</h3>')
+            .replace(/## \*\*Key Personas to Target:\*\*/g, '<h3 style="color: #4f46e5; margin: 32px 0 16px 0; font-size: 20px; font-weight: 600;">Key Personas to Target:</h3>')
+            .replace(/## \*\*Campaign Ideas for.*?:\*\*/g, '<h3 style="color: #4f46e5; margin: 32px 0 16px 0; font-size: 20px; font-weight: 600;">Campaign Ideas:</h3>')
+            .replace(/### \*\*Campaign \d+: "(.*?)"\*\*/g, '<div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;"><h4 style="color: #1f2937; margin: 0 0 12px 0; font-size: 18px; font-weight: 600;">$1</h4>')
+            .replace(/\*\*Target\*\*:/g, '<p style="margin: 8px 0;"><strong>Target:</strong>')
+            .replace(/\*\*Example email:\*\*/g, '<p style="margin: 12px 0 0 0;"><strong>Example email:</strong></p><p style="background: white; padding: 16px; border-left: 4px solid #4f46e5; margin: 8px 0; font-style: italic; color: #374151;">')
+            .replace(/### ⚠️ \*\*Note on Social Proof\*\*:/g, '<div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 16px; border-radius: 8px; margin: 32px 0;"><h4 style="color: #92400e; margin: 0 0 8px 0;">⚠️ Note on Social Proof:</h4>')
+            .replace(/\*\*Want VeoGrowth to execute these campaigns\?\*\*/g, '</div><h3 style="color: #1f2937; margin: 32px 0 16px 0; font-size: 22px; font-weight: 700; text-align: center;">Want VeoGrowth to execute these campaigns?</h3>')
+            .replace(/\[Book a Strategy Call →\]/g, '')
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+            .replace(/---/g, '<hr style="border: none; border-top: 1px solid #e5e7eb; margin: 32px 0;">')
+            .replace(/- ([^\n]+)/g, '<li style="margin: 6px 0;">$1</li>')
+            .replace(/(<li.*?<\/li>\n?)(<li)/g, '$1$2')
+            .replace(/(<li.*?<\/li>)(?!\s*<li)/g, '<ul style="margin: 12px 0; padding-left: 24px;">$1</ul>')
+            .replace(/"Hi \[Name\],([^"]+)"/g, '<span style="background: white; padding: 16px; display: block; border-left: 4px solid #4f46e5; margin: 8px 0; font-style: italic; color: #374151;">"Hi [Name],$1"</span></div>')
+          }
         </div>
         
-        <div class="cta-box">
-          <h3>Want VeoGrowth to execute these campaigns?</h3>
-          <p>We'll build targeted lists, craft hyper-personalized messages, and book qualified meetings directly in your calendar.</p>
-          <a href="https://calendly.com/veogrowth/strategy" class="cta-button">
+        <div style="margin-top: 40px; padding: 32px; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; border-radius: 12px; text-align: center;">
+          <h3 style="margin-bottom: 16px; font-size: 24px; font-weight: 600;">
+            Want VeoGrowth to execute these campaigns?
+          </h3>
+          <p style="margin-bottom: 24px; font-size: 18px; opacity: 0.9;">
+            We'll build targeted lists, craft hyper-personalized messages, and book qualified meetings directly in your calendar.
+          </p>
+          <a href="https://calendly.com/veogrowth/strategy" 
+             style="display: inline-block; background: white; color: #4f46e5; padding: 16px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 18px; transition: transform 0.2s;"
+             onmouseover="this.style.transform='translateY(-2px)'"
+             onmouseout="this.style.transform='translateY(0)'">
             Book a Strategy Call →
           </a>
         </div>
