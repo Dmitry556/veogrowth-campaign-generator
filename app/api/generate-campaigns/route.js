@@ -51,63 +51,48 @@ export async function POST(req) {
       }, { status: 500 });
     }
     
-    // Step 5: Simple analysis for now
-    console.log('Generating simple analysis...');
+  // Step 5: Analysis with web search
+    console.log('Generating analysis with web search...');
     
     try {
       const message = await anthropic.messages.create({
         model: 'claude-opus-4-20250514',
-        max_tokens: 1000,
+        max_tokens: 4000,
+        temperature: 0.7,
         messages: [
           {
             role: 'user',
-            content: `Analyze ${website} and suggest B2B cold email campaigns. They say their positioning is: ${positioning}`
+            content: `Use web search to analyze ${website} and create a detailed B2B cold email campaign analysis. 
+            
+            First, search for and analyze their website. Then search for "${website.replace(/https?:\/\//, '').replace('www.', '')} case studies" or testimonials.
+            
+            Create a comprehensive analysis with:
+            1. Positioning Assessment
+            2. ICP definition
+            3. Key Personas
+            4. 3 specific campaign ideas with example emails
+            
+            The user indicated their positioning is: ${positioning === 'yes' ? 'clear' : positioning === 'no' ? 'unclear' : 'unsure'}`
+          }
+        ],
+        tools: [
+          {
+            type: 'web_search_20250305',
+            name: 'web_search',
+            max_uses: 5
           }
         ]
       });
       
       console.log('Claude response received');
-      const analysis = message.content[0].text;
+      console.log('Tool use:', message.stop_reason);
       
-      // Extract company name
-      const company = website
-        .replace(/https?:\/\//, '')
-        .replace('www.', '')
-        .split('/')[0];
-      
-      console.log('SUCCESS - returning analysis');
-      
-      return Response.json({
-        success: true,
-        data: {
-          company,
-          positioning,
-          analysis: `<div class="prose max-w-none">
-            <h2>Analysis for ${company}</h2>
-            ${analysis}
-          </div>`
+      // Get the final text from Claude's response
+      let analysis = '';
+      for (const content of message.content) {
+        if (content.type === 'text') {
+          analysis += content.text;
         }
-      });
+      }
       
-    } catch (claudeError) {
-      console.error('Claude call FAILED:', claudeError);
-      return Response.json({ 
-        success: false, 
-        error: `Claude error: ${claudeError.message}` 
-      }, { status: 500 });
-    }
-    
-  } catch (error) {
-    console.error('Unexpected error:', error);
-    return Response.json({ 
-      success: false, 
-      error: `Unexpected error: ${error.message}` 
-    }, { status: 500 });
-  }
-}
-
-export async function GET() {
-  return Response.json({ 
-    message: 'VeoGrowth API is running!' 
-  });
-}
+      console.log('Analysis length:', analysis.length);
