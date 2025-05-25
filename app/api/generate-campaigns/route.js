@@ -1,3 +1,5 @@
+export const maxDuration = 300; // 5 minutes timeout
+
 import Anthropic from '@anthropic-ai/sdk';
 
 const anthropic = new Anthropic({
