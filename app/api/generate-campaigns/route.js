@@ -178,8 +178,6 @@ We'll build targeted lists, craft hyper-personalized messages, and book qualifie
   .replace('{website}', website)
   .replace('{positioning}', positioning === 'yes' ? 'clear' : 'unclear')
   .replace('{content}', websiteContent.substring(0, 8000));
-
-Generate the analysis now:`;
     
     // Call Claude Opus
     const message = await anthropic.messages.create({
