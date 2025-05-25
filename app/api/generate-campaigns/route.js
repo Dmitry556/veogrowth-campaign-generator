@@ -397,28 +397,11 @@ export async function POST(req) {
           content: prompt
         }
       ],
-      tools: [
+     tools: [
         {
-          name: 'web_fetch',
-          description: 'Fetch the contents of a web page at a given URL',
-          input_schema: {
-            type: 'object',
-            properties: {
-              url: { type: 'string', description: 'The URL to fetch' }
-            },
-            required: ['url']
-          }
-        },
-        {
+          type: 'web_search_20250305',
           name: 'web_search',
-          description: 'Search the web for information',
-          input_schema: {
-            type: 'object',
-            properties: {
-              query: { type: 'string', description: 'The search query' }
-            },
-            required: ['query']
-          }
+          max_uses: 5
         }
       ]
     });
