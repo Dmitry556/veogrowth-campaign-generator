@@ -15,20 +15,24 @@ const openai = new OpenAI({
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Helper function to search and fetch with GPT-4.1 Mini
-async function performWebResearch(website, prompt) {
+async function performWebResearch(website, promptText) { // Renamed 'prompt' to 'promptText' for clarity
   try {
+    // Initial messages to send to OpenAI
+    const initialMessages = [
+      {
+        role: "system",
+        content: "You are a web research assistant. Use the provided tools to search and fetch information."
+      },
+      {
+        role: "user",
+        content: promptText.replace('{website}', website).replace('{domain}', website.replace(/https?:\/\//, '').replace('www.', ''))
+      }
+    ];
+
+    // First call to OpenAI, asking it to decide on tools
     const completion = await openai.chat.completions.create({
       model: "gpt-4.1-mini",
-      messages: [
-        {
-          role: "system",
-          content: "You are a web research assistant. Use the provided tools to search and fetch information."
-        },
-        {
-          role: "user", 
-          content: prompt.replace('{website}', website).replace('{domain}', website.replace(/https?:\/\//, '').replace('www.', ''))
-        }
-      ],
+      messages: initialMessages,
       tools: [
         {
           type: "function",
@@ -60,71 +64,86 @@ async function performWebResearch(website, prompt) {
         }
       ],
       tool_choice: "auto",
-      max_tokens: 2000,
+      max_tokens: 2000, // Max tokens for the response that might include tool calls
       temperature: 0.3
     });
 
-    // Handle tool calls
-    const message = completion.choices[0].message;
-    
+    const message = completion.choices[0].message; // Assistant's first response
+
+    // If the AI decided to use tools
     if (message.tool_calls) {
       const toolOutputs = [];
-      
+
       for (const toolCall of message.tool_calls) {
         const functionName = toolCall.function.name;
         const functionArgs = JSON.parse(toolCall.function.arguments);
-        
         let toolResult = "";
-        
+
         if (functionName === "web_search") {
           // Simulate web search - in production, use actual search API
           toolResult = `Search results for "${functionArgs.query}": [Simulated search results - implement actual search]`;
+          console.log(`Simulated web search for: ${functionArgs.query}`);
         } else if (functionName === "fetch_url") {
           // Fetch actual URL content
           try {
+            console.log(`Fetching URL: ${functionArgs.url}`);
             const response = await fetch(functionArgs.url, {
               headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
               },
-              signal: AbortSignal.timeout(10000)
+              signal: AbortSignal.timeout(15000) // Increased timeout slightly
             });
-            
+
             if (response.ok) {
               const html = await response.text();
-              toolResult = html.substring(0, 10000); // Limit content
+              toolResult = html.substring(0, 15000); // Limit content, slightly increased
+              console.log(`Fetched content successfully from ${functionArgs.url} (first 100 chars): ${toolResult.substring(0,100)}`);
+            } else {
+              toolResult = `Failed to fetch URL ${functionArgs.url}. Status: ${response.status}`;
+              console.error(`Failed to fetch URL ${functionArgs.url}. Status: ${response.status}`);
             }
           } catch (e) {
-            toolResult = "Failed to fetch URL";
+            toolResult = `Failed to fetch URL ${functionArgs.url}. Error: ${e.message}`;
+            console.error(`Error fetching URL ${functionArgs.url}:`, e);
           }
         }
-        
+
         toolOutputs.push({
           tool_call_id: toolCall.id,
-          output: toolResult
+          output: toolResult // This is the content for the tool message
         });
       }
-      
-      // Get final response with tool results
+
+      // Second call to OpenAI, providing tool results to get the final summary
       const finalResponse = await openai.chat.completions.create({
         model: "gpt-4.1-mini",
         messages: [
-          ...completion.choices[0].message,
-          {
-            role: "tool",
-            content: JSON.stringify(toolOutputs)
-          }
+          ...initialMessages, // Original system and user messages
+          message, // Assistant's response that included the tool_calls
+          // Map each toolOutput to a message with role: "tool"
+          ...toolOutputs.map(tOut => {
+            const originalToolCall = message.tool_calls.find(tc => tc.id === tOut.tool_call_id);
+            return {
+              role: "tool",
+              tool_call_id: tOut.tool_call_id,
+              name: originalToolCall ? originalToolCall.function.name : undefined,
+              content: String(tOut.output) // Ensure content is a string
+            };
+          })
         ],
-        max_tokens: 2000
+        max_tokens: 2000 // Max tokens for the summarized research result
       });
-      
+
       return finalResponse.choices[0].message.content;
     }
-    
+
+    // If no tool calls were made in the first response, return its content directly
     return message.content;
-    
+
   } catch (error) {
-    console.error('Research error:', error);
-    return null;
+    // Log more details for debugging
+    console.error(`Research error during performWebResearch for website "${website}" with prompt starting with "${promptText.substring(0, 50)}...":`, error);
+    return null; // Return null if any error occurs during research
   }
 }
 
@@ -825,7 +844,7 @@ export async function POST(req) {
 
     // Call Claude Opus 4 for campaign generation
     const message = await anthropic.messages.create({
-      model: 'claude-4-opus-20250514',
+      model: 'claude-4-opus-20250514', // Ensure this is the correct model identifier if you change it
       max_tokens: 4000,
       temperature: 0.7,
       messages: [
