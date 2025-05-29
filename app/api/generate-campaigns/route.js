@@ -16,11 +16,8 @@ let geminiResearchModel;
 if (GEMINI_API_KEY) {
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
   geminiResearchModel = genAI.getGenerativeModel({
-    // Using the specific date-versioned 2.5 Pro Preview model
-    model: "gemini-2.5-pro-preview-05-06", // <--- THIS IS THE CORRECTED LINE
-    tools: [{
-      googleSearchRetrieval: {} 
-    }],
+    model: "gemini-2.5-pro-preview-05-06", // Using your desired 2.5 Pro Preview model
+    // REMOVED: tools: [{ googleSearchRetrieval: {} }], - let's see if it uses search via prompt
     safetySettings: [
       { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
       { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
@@ -35,11 +32,10 @@ if (GEMINI_API_KEY) {
   console.error("GEMINI_API_KEY is not set. Gemini research will be disabled.");
 }
 
-
 // Initialize Resend Client
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Helper function to perform research with Gemini and its search tool
+// Helper function to perform research with Gemini
 async function performResearchWithGemini(website, researchPromptObject) {
   const promptIdentifier = researchPromptObject.promptName || 'unknown_research';
   const promptText = researchPromptObject.content;
@@ -103,8 +99,8 @@ const RESEARCH_PROMPTS = {
   homepage: {
     promptName: "HomepageAnalysis",
     content: `<homepage_analysis_task>
-You are an expert business analyst. Fetch and analyze the homepage of {website} to understand their product and positioning.
-Use your web search tool if necessary to understand the company better or to augment information from the direct fetch of {website}.
+You are an expert business analyst. Analyze the content of the homepage of {website} to understand their product and positioning.
+If the direct content is insufficient, use your web search capabilities to understand the company {company} at {website} better.
 
 <extraction_requirements>
 <product_details>
@@ -155,7 +151,7 @@ Ensure all string values are properly escaped within the JSON.
   caseStudies: {
     promptName: "CaseStudyAnalysis",
     content: `<case_study_search_task>
-You are an expert market researcher. Find customer success stories, case studies, and testimonials for the company at {website}.
+You are an expert market researcher. Find customer success stories, case studies, and testimonials for the company {company} at {website}.
 Use your web search tool extensively. Search for things like:
 - "{company} case studies"
 - "{company} customer success stories"
@@ -213,7 +209,7 @@ Ensure all string values are properly escaped within the JSON.
   marketContext: {
     promptName: "MarketContextAnalysis",
     content: `<market_context_task>
-You are an expert competitive intelligence analyst. Analyze {website}'s market positioning and competitive landscape.
+You are an expert competitive intelligence analyst. Analyze {company}'s ({website}) market positioning and competitive landscape.
 Use your web search tool extensively. Search for things like:
 - "{company} vs [known competitor in their space if you can infer one]"
 - "{company} alternatives"
@@ -671,6 +667,75 @@ Remember: The quality bar is EXTREMELY high. Every campaign idea must feel like 
 
 For agencies especially: ALWAYS include specific things found on their site, exact execution plans, and valuable free offers.`;
 
+// --- Function to send email with analysis ---
+async function sendEmailReport(email, analysis, company) {
+  try {
+    const emailHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 40px;">
+          <h1 style="color: #1f2937; margin: 0;">VeoGrowth</h1>
+          <p style="color: #6b7280; margin-top: 5px;">AI-Powered B2B Lead Generation</p>
+        </div>
+
+        <div style="background: #f9fafb; padding: 30px; border-radius: 10px; margin-bottom: 30px;">
+          <h2 style="color: #1f2937; margin-top: 0;">Your Campaign Analysis for ${company}</h2>
+          <p style="color: #4b5563;">Thank you for using VeoGrowth's Campaign Generator! We've analyzed your website and created three hyper-personalized cold email campaigns targeting your ideal customers.</p>
+        </div>
+
+        <div style="background: white; padding: 30px; border: 1px solid #e5e7eb; border-radius: 10px; margin-bottom: 30px;">
+          ${analysis}
+        </div>
+
+        <div style="background: #4f46e5; color: white; padding: 30px; border-radius: 10px; text-align: center; margin-bottom: 30px;">
+          <h2 style="margin-top: 0; margin-bottom: 15px;">Ready to Execute These Campaigns?</h2>
+          <p style="margin-bottom: 20px; opacity: 0.9;">VeoGrowth will implement these campaigns for you:</p>
+          <ul style="text-align: left; max-width: 400px; margin: 0 auto 25px; padding-left: 20px;">
+            <li style="margin-bottom: 10px;">Build targeted lists (3,000-5,000 prospects)</li>
+            <li style="margin-bottom: 10px;">Craft hyper-personalized messages for each</li>
+            <li style="margin-bottom: 10px;">Book qualified meetings in your calendar</li>
+            <li>Only pay for meetings that show up</li>
+          </ul>
+          <a href="https://calendly.com/veogrowth/strategy" style="display: inline-block; background: white; color: #4f46e5; padding: 15px 35px; border-radius: 5px; text-decoration: none; font-weight: bold;">Book Your Strategy Call</a>
+        </div>
+
+        <div style="text-align: center; color: #6b7280; font-size: 14px;">
+          <p>Questions? Reply to this email and I'll personally respond.</p>
+          <p style="margin-top: 20px;">
+            Best regards,<br>
+            <strong>Dmitry Pinchuk</strong><br>
+            Founder, VeoGrowth
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const { data, error } = await resend.emails.send({
+      from: 'VeoGrowth <campaigns@veogrowth.com>',
+      to: email,
+      subject: `Your B2B Cold Email Campaigns for ${company}`,
+      html: emailHtml,
+      replyTo: 'dmitry@veogrowth.com'
+    });
+
+    if (error) {
+      console.error('Email send error:', error);
+      return { success: false, error };
+    }
+
+    console.log('Email sent successfully:', data);
+    return { success: true, data };
+  } catch (error) {
+    console.error('Email send error:', error);
+    return { success: false, error: error.message };
+  }
+}
 
 // --- MAIN API ROUTE FUNCTION (POST) ---
 export async function POST(req) {
@@ -751,23 +816,40 @@ export async function POST(req) {
                 if (!match.endsWith('</div>')) emailContent += '</div>'; 
                 return p1 + emailContent;
             })
-            .replace(/### ⚠️ \*\*Note on Social Proof\*\*:/g, (match) => {
-                let prefix = '</div>'; // Close previous email example div
-                const precedingText = analysis.substring(0, analysis.indexOf(match));
-                if (precedingText.match(/<div style="background: #f3f4f6.*?$/s) && !precedingText.endsWith('</div>')) {
-                   prefix += '</div>'; // Close campaign block div if open
+            .replace(/### ⚠️ \*\*Note on Social Proof\*\*:/g, (match) => { // Adjusted this regex to be more robust
+                let prefix = '</div>'; // Assume previous was an email example, needs closing
+                const analysisUpToMatch = analysis.substring(0, analysis.indexOf(match));
+                const openCampaignBlock = analysisUpToMatch.lastIndexOf('<div style="background: #f3f4f6');
+                const openEmailBlock = analysisUpToMatch.lastIndexOf('<div style="background: white');
+                
+                if (openCampaignBlock > openEmailBlock && !analysisUpToMatch.substring(openCampaignBlock).includes('</div>')) {
+                    // If campaign block is open and email block is not more recent or is closed
+                     prefix = '</div></div>'; // Close email and campaign block
+                } else if (openEmailBlock > openCampaignBlock && !analysisUpToMatch.substring(openEmailBlock).includes('</div>')) {
+                    // This case should be handled by the previous regex, but as a fallback
+                    prefix = '</div>'; // Close email block
                 }
+
+
                 return prefix + '<div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 16px; border-radius: 8px; margin: 32px 0;"><h4 style="color: #92400e; margin: 0 0 8px 0;">⚠️ Note on Social Proof:</h4>';
             })
-            .replace(/\*\*Want VeoGrowth to execute these campaigns\?\*\*/g, (match) => {
+            .replace(/\*\*Want VeoGrowth to execute these campaigns\?\*\*/g, (match) => { // Adjusted this regex
                 let prefix = '';
-                const precedingText = analysis.substring(0, analysis.indexOf(match));
-                if (precedingText.match(/<div style="background: #fef3c7.*?$/s) && !precedingText.endsWith('</div>')) {
-                   prefix = '</div>'; // Close social proof div
-                } else if (precedingText.match(/<div style="background: white.*?$/s) && !precedingText.endsWith('</div></div>')) {
-                   prefix = '</div></div>'; // Close email example and campaign block
-                } else if (precedingText.match(/<div style="background: #f3f4f6.*?$/s) && !precedingText.endsWith('</div>')) {
-                   prefix = '</div>'; // Close campaign block
+                const analysisUpToMatch = analysis.substring(0, analysis.indexOf(match));
+
+                // Check if the social proof div was the last thing and needs closing
+                const openSocialProofBlock = analysisUpToMatch.lastIndexOf('<div style="background: #fef3c7');
+                if (openSocialProofBlock !== -1 && !analysisUpToMatch.substring(openSocialProofBlock).includes('</div>')) {
+                    prefix = '</div>';
+                } else {
+                    // Default: assume an email example or campaign block might need closing
+                    const openCampaignBlock = analysisUpToMatch.lastIndexOf('<div style="background: #f3f4f6');
+                    const openEmailBlock = analysisUpToMatch.lastIndexOf('<div style="background: white');
+                    if (openCampaignBlock > openEmailBlock && !analysisUpToMatch.substring(openCampaignBlock).includes('</div>')) {
+                         prefix = '</div></div>'; 
+                    } else if (openEmailBlock > openCampaignBlock && !analysisUpToMatch.substring(openEmailBlock).includes('</div>')) {
+                        prefix = '</div>';
+                    }
                 }
                 return prefix + '<h3 style="color: #1f2937; margin: 32px 0 16px 0; font-size: 22px; font-weight: 700; text-align: center;">Want VeoGrowth to execute these campaigns?</h3>';
             })
