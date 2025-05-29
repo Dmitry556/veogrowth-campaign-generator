@@ -72,40 +72,53 @@ Example: {"identified_competitors": ["CompetitorX", "CompetitorY"], "core_differ
 
 // Function to perform research with Claude Haiku + Web Search
 async function performClaudeHaikuResearch(website, researchObjective) {
-  const companyNameFromUrl = website.replace(/https?:\/\//, '').replace('www.', '').split('/')[0];
+  const companyNameFromUrl = website.replace(/https?:\/\//, "").replace("www.", "").split("/")[0];
   const prompt = researchObjective.content
-    .replace('{website}', website)
-    .replace('{company}', companyNameFromUrl); // Assuming {company} is just the domain name part
+    .replace("{website}", website)
+    .replace(/{company}/g, companyNameFromUrl); // Replace all instances of {company}
 
   console.log(`Starting Haiku research: ${researchObjective.promptName} for ${website}`);
   console.time(researchObjective.promptName);
+  let outputText = ""; // Initialize outputText to ensure it's always a string
 
   try {
     const response = await anthropicClient.messages.create({
-      model: "claude-3-5-haiku-latest", // Using latest Haiku
-      max_tokens: 1500, // Sufficient for structured JSON research snippets
+      model: "claude-3-5-haiku-latest", 
+      max_tokens: 1500, 
       messages: [{ role: "user", content: prompt }],
       tools: [{
         "type": "web_search_20250305",
         "name": "web_search",
-        "max_uses": 3 // Limiting searches for Haiku for speed
+        "max_uses": 3 
       }]
     });
+    
+    if (response && response.content && response.content.length > 0 && typeof response.content[0].text === 'string') {
+      outputText = response.content[0].text;
+      console.log(`Haiku research ${researchObjective.promptName} completed. Raw output (first 100): ${outputText.substring(0, 100)}`);
+    } else {
+      console.warn(`Haiku research ${researchObjective.promptName} for ${website} returned no valid text content or unexpected structure. Response:`, JSON.stringify(response, null, 2));
+      outputText = JSON.stringify({ error: `Haiku returned no text content for ${researchObjective.promptName}` }); 
+    }
+    
     console.timeEnd(researchObjective.promptName);
-
-    const outputText = response.content[0].text;
-    console.log(`Haiku research ${researchObjective.promptName} completed. Raw output (first 100): ${outputText.substring(0,100)}`);
     return safeJsonParse(outputText, researchObjective.promptName);
 
   } catch (error) {
-    console.timeEnd(researchObjective.promptName);
+    // Ensure console.timeEnd is called even if an error occurs before it would normally be.
+    // The 'no such label' warning means it was called twice or the label was never started correctly.
+    // We can try to remove the console.timeEnd from here if it's always hit in the try block.
+    // For now, let's leave it but be aware of the warning.
+    // console.timeEnd(researchObjective.promptName); // This might cause "no such label" if error is before timeEnd in try.
+    
     console.error(`Error during Haiku research (${researchObjective.promptName}) for ${website}:`, error);
-    return { error: `Failed Haiku research for ${researchObjective.promptName}`, details: error.message };
+    // Construct a JSON string for the error to be consistent with successful returns for safeJsonParse
+    const errorDetails = error.message ? error.message : "Unknown error during Haiku research";
+    return safeJsonParse(JSON.stringify({ error: `Failed Haiku research for ${researchObjective.promptName}`, details: errorDetails }), researchObjective.promptName);
   }
 }
 
 // --- CLAUDE OPUS METAPROMPT for Campaign Generation (using research from Haiku) ---
-// This is your original METAPROMPT, adapted to use the structured research from Haiku
 const CLAUDE_OPUS_GENERATION_METAPROMPT = `You are VeoGrowth's AI strategist analyzing a company's website to generate hyper-specific B2B cold email campaign ideas. You will produce EXACTLY the same format and quality as shown in the examples, with zero deviation.
 
 CRITICAL CONTEXT: VeoGrowth is an AI-powered lead generation agency that creates hyper-personalized cold email campaigns. We help companies book qualified meetings by understanding their prospects deeply and crafting messages that resonate.
@@ -124,7 +137,7 @@ NEVER FORGET RULES:
 3. Always use periods between sentences. Never use dashes as sentence separators.
 4. Never start observations with "noticed" or "saw". Jump straight to the fact.
 5. Make every observable fact specific and publicly findable (or clearly derivable from the Research Data).
-6. If research_data_json.caseStudyInfo.found_case_studies is empty or research_data_json.caseStudyInfo.search_summary_note indicates no good case studies were found, ALWAYS include the "socialProofNote" in your JSON output.
+6. If (!research_data_json.caseStudyInfo || !research_data_json.caseStudyInfo.found_case_studies || research_data_json.caseStudyInfo.found_case_studies.length === 0 || (research_data_json.caseStudyInfo.search_summary_note && research_data_json.caseStudyInfo.search_summary_note.toLowerCase().includes("no"))), ALWAYS include the "socialProofNote" in your JSON output.
 7. Target segments must be substantial (1,000+ prospects minimum).
 8. When appropriate for personalization, use natural vivid imagery relevant to the prospect's pain.
 9. For agencies: ALWAYS include specific execution details and valuable offers in the "veoGrowthPitch".
@@ -169,9 +182,18 @@ Example of the overall JSON structure (content will vary):
     {
       "name": "[Descriptive Campaign Name 1]",
       "target": "[Target persona 1] at [company type using target_audience_keywords]",
-      "emailBody": "Hi [Name], [Observable fact about prospect's company related to research_data_json.homepageInfo.product_description]. [Vivid pain point]. {website} helped [IF research_data_json.caseStudyInfo.found_case_studies is not empty, use research_data_json.caseStudyInfo.found_case_studies[0].customer_name, ELSE 'companies like yours'] achieve [IF research_data_json.caseStudyInfo.found_case_studies is not empty, use research_data_json.caseStudyInfo.found_case_studies[0].key_result_or_benefit, ELSE a benefit related to research_data_json.homepageInfo.key_features]. [CTA?]"
+      "emailBody": "Hi [Name], [Observable fact about prospect's company related to research_data_json.homepageInfo.product_description]. [Vivid pain point]. {company} helped [IF research_data_json.caseStudyInfo.found_case_studies && research_data_json.caseStudyInfo.found_case_studies.length > 0, use research_data_json.caseStudyInfo.found_case_studies[0].customer_name, ELSE 'companies like yours'] achieve [IF research_data_json.caseStudyInfo.found_case_studies && research_data_json.caseStudyInfo.found_case_studies.length > 0, use research_data_json.caseStudyInfo.found_case_studies[0].key_result_or_benefit, ELSE a benefit related to research_data_json.homepageInfo.key_features]. [CTA?]"
+    },
+    {
+      "name": "[Descriptive Campaign Name 2]",
+      "target": "[Target persona 2] at [different company type]",
+      "emailBody": "Hi [Name], [Different observable fact]. [Different pain point]. Using {company}'s [research_data_json.homepageInfo.key_features[1] if available, else a general feature], companies like [IF research_data_json.caseStudyInfo.found_case_studies && research_data_json.caseStudyInfo.found_case_studies.length > 1, use research_data_json.caseStudyInfo.found_case_studies[1].customer_name, ELSE IF research_data_json.caseStudyInfo.found_case_studies && research_data_json.caseStudyInfo.found_case_studies.length > 0, 'another leading business', ELSE 'other businesses'] saw [IF research_data_json.caseStudyInfo.found_case_studies && research_data_json.caseStudyInfo.found_case_studies.length > 1, research_data_json.caseStudyInfo.found_case_studies[1].key_result_or_benefit, ELSE IF research_data_json.caseStudyInfo.found_case_studies && research_data_json.caseStudyInfo.found_case_studies.length > 0, 'significant improvements', ELSE 'positive results']. [Different CTA?]"
+    },
+    {
+      "name": "[Descriptive Campaign Name 3]",
+      "target": "[Target persona 3] at [third company type]",
+      "emailBody": "Hi [Name], [Third observable fact, perhaps related to research_data_json.marketInfo.identified_competitors[0] if available]. [Pain point]. {company} addresses this by [research_data_json.marketInfo.core_differentiators[0] if available, else research_data_json.homepageInfo.product_description]. [General benefit or a reference to research_data_json.homepageInfo.value_props[0] if available]. [Third CTA?]"
     }
-    // ... (2 more campaign ideas, varying how they use the research data)
   ],
   "socialProofNote": "[Generate if rule 6 applies, using research_data_json.caseStudyInfo.search_summary_note, else empty string]",
   "veoGrowthPitch": "Want VeoGrowth to execute these campaigns? We'll leverage insights about your [research_data_json.homepageInfo.product_description] to connect with ideal clients.",
@@ -207,28 +229,27 @@ The "campaignIdeas" array would contain 3 campaign objects, for example, the fir
   "target": "VP of Service at Machine Builders with 10+ field technicians",
   "emailBody": "Hi Mark, many Machine Builders struggle with high travel costs for service calls. IXON's IIoT platform helped Repak cut on-site visits by 70% through secure remote access. Worth exploring how you can achieve similar savings?"
 }
-... (and two other campaign objects for IXON) ...
+// ... (and two other campaign objects for IXON) ...
 The "socialProofNote" would be an empty string.
 The "veoGrowthPitch": "Want VeoGrowth to execute these campaigns? We'll build targeted lists of machine builders struggling with service costs and craft messages that resonate with their specific challenges."
 The "prospectTargetingNote": "Note: These campaigns would target approximately 3,000-5,000 qualified Machine Builders and OEMs in North America and Europe."
 
 ---
 EXAMPLE 2 - SaaS with Unclear Positioning (Tourmo):
-...(Follow the JSON structure, populating with hypothetical Tourmo research data from Haiku and campaign ideas from Opus)...
+// ... (Follow the JSON structure, populating with hypothetical Tourmo research data from Haiku and campaign ideas from Opus) ...
 "socialProofNote": "Our AI research found limited specific case studies for Tourmo. The research notes: '[Content from research_data_json.caseStudyInfo.search_summary_note for Tourmo]'. The examples above use hypothetical scenarios. When we work together, you'll provide real customer success stories."
-"additionalRecommendations": "Consider leading with ONE killer use case..." // This field is NOT in the defined schema, so do not include it unless you add it to the <output_instructions> JSON schema.
 
 ---
 EXAMPLE 3 - Agency with Hyper-Personalization (ConversionLab):
-...(Follow the JSON structure for ConversionLab)...
+// ...(Follow the JSON structure for ConversionLab)...
 
 ---
 EXAMPLE 4 - SEO Agency with Specific Execution (RankRise):
-...(Follow the JSON structure for RankRise)...
+// ...(Follow the JSON structure for RankRise)...
 
 ---
 EXAMPLE 5 - Email Marketing Agency with Deep Personalization (FlowMasters):
-...(Follow the JSON structure for FlowMasters)...
+// ...(Follow the JSON structure for FlowMasters)...
 
 Remember: The quality bar is EXTREMELY high. Every campaign idea must feel like it required hours of research and deep industry knowledge, drawing from the {research_data_json}.
 Your entire output MUST be only the single JSON object. Adhere strictly to the defined JSON output structure.
@@ -255,7 +276,7 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
           .pitch-section { background: #4f46e5; color: white; padding: 20px; border-radius: 8px; text-align: center; margin-top:30px; }
           .pitch-section h2 { color: white; border: none;}
           .pitch-section a { display: inline-block; background: white; color: #4f46e5; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold; margin-top:15px;}
-          ul { padding-left: 20px; }
+          ul { padding-left: 20px; list-style-position: inside; }
         </style>
       </head>
       <body>
@@ -271,29 +292,29 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
 
         <div>
           <h2>Positioning Assessment</h2>
-          <p>${claudeAnalysisJson.positioningAssessmentOutput || 'Not available.'}</p>
+          <p>${claudeAnalysisJson.positioningAssessmentOutput?.replace(/</g, "<").replace(/>/g, ">") || 'Not available.'}</p>
 
           <h2>Ideal Customer Profile</h2>
-          <p><strong>Industry:</strong> ${claudeAnalysisJson.idealCustomerProfile?.industry || 'N/A'}</p>
-          <p><strong>Company Size:</strong> ${claudeAnalysisJson.idealCustomerProfile?.companySize || 'N/A'}</p>
+          <p><strong>Industry:</strong> ${claudeAnalysisJson.idealCustomerProfile?.industry?.replace(/</g, "<").replace(/>/g, ">") || 'N/A'}</p>
+          <p><strong>Company Size:</strong> ${claudeAnalysisJson.idealCustomerProfile?.companySize?.replace(/</g, "<").replace(/>/g, ">") || 'N/A'}</p>
           <p><strong>Key Characteristics:</strong></p>
           <ul>${(claudeAnalysisJson.idealCustomerProfile?.keyCharacteristics || []).map(char => `<li>${char.replace(/</g, "<").replace(/>/g, ">")}</li>`).join('')}</ul>
 
           <h2>Key Personas</h2>
           ${(claudeAnalysisJson.keyPersonas || []).map(persona => `
             <div class="campaign-card" style="background:#eef2ff; border-left: 3px solid #6366f1;">
-              <h4>${persona.title.replace(/</g, "<").replace(/>/g, ">")}</h4>
-              <p><strong>Pain Points:</strong> ${persona.painPoints.replace(/</g, "<").replace(/>/g, ">")}</p>
+              <h4>${persona.title?.replace(/</g, "<").replace(/>/g, ">") || 'N/A'}</h4>
+              <p><strong>Pain Points:</strong> ${persona.painPoints?.replace(/</g, "<").replace(/>/g, ">") || 'N/A'}</p>
             </div>
           `).join('')}
 
           <h2>Campaign Ideas</h2>
           ${(claudeAnalysisJson.campaignIdeas || []).map(campaign => `
             <div class="campaign-card">
-              <h3>${campaign.name.replace(/</g, "<").replace(/>/g, ">")}</h3>
-              <p><strong>Target:</strong> ${campaign.target.replace(/</g, "<").replace(/>/g, ">")}</p>
+              <h3>${campaign.name?.replace(/</g, "<").replace(/>/g, ">") || 'N/A'}</h3>
+              <p><strong>Target:</strong> ${campaign.target?.replace(/</g, "<").replace(/>/g, ">") || 'N/A'}</p>
               <p><strong>Example Email:</strong></p>
-              <div class="email-body">${campaign.emailBody.replace(/\n/g, '<br>').replace(/</g, "<").replace(/>/g, ">")}</div>
+              <div class="email-body">${campaign.emailBody?.replace(/\n/g, '<br>').replace(/</g, "<").replace(/>/g, ">") || 'N/A'}</div>
             </div>
           `).join('')}
 
@@ -305,8 +326,8 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
           ` : ''}
           
           <div style="margin-top:30px; padding-top:20px; border-top:1px solid #e5e7eb;">
-            <p><strong>VeoGrowth Pitch:</strong> ${claudeAnalysisJson.veoGrowthPitch || ''}</p>
-            <p><em>${claudeAnalysisJson.prospectTargetingNote || ''}</em></p>
+            <p><strong>VeoGrowth Pitch:</strong> ${(claudeAnalysisJson.veoGrowthPitch || '').replace(/</g, "<").replace(/>/g, ">")}</p>
+            <p><em>${(claudeAnalysisJson.prospectTargetingNote || '').replace(/</g, "<").replace(/>/g, ">")}</em></p>
           </div>
         </div>
 
@@ -374,57 +395,56 @@ export async function POST(req) {
 
     // Step 1: Perform research with Claude Haiku (3 tasks in parallel)
     console.log(`Starting PARALLEL Haiku research for ${website}...`);
+    console.time("HaikuResearchTotal");
     const [homepageInfo, caseStudyInfo, marketInfo] = await Promise.all([
       performClaudeHaikuResearch(website, HAIKU_RESEARCH_PROMPTS.homepage),
       performClaudeHaikuResearch(website, HAIKU_RESEARCH_PROMPTS.caseStudies),
       performClaudeHaikuResearch(website, HAIKU_RESEARCH_PROMPTS.marketContext)
     ]);
+    console.timeEnd("HaikuResearchTotal");
     console.log(`All PARALLEL Haiku research completed for ${website}.`);
 
     const researchDataForOpus = {
-      homepageInfo: homepageInfo.error ? { error: homepageInfo.error } : homepageInfo,
-      caseStudyInfo: caseStudyInfo.error ? { error: caseStudyInfo.error } : caseStudyInfo,
-      marketInfo: marketInfo.error ? { error: marketInfo.error } : marketInfo,
+      homepageInfo: homepageInfo.error ? { error: homepageInfo.error, details: homepageInfo.details } : homepageInfo,
+      caseStudyInfo: caseStudyInfo.error ? { error: caseStudyInfo.error, details: caseStudyInfo.details } : caseStudyInfo,
+      marketInfo: marketInfo.error ? { error: marketInfo.error, details: marketInfo.details } : marketInfo,
     };
     console.log('HAIKU RESEARCH OUTPUT (to be passed to Opus):', JSON.stringify(researchDataForOpus, null, 2));
 
     // Step 2: Generate Campaigns with Claude Opus, using Haiku's research
     const finalPromptForOpus = CLAUDE_OPUS_GENERATION_METAPROMPT
-      .replace('{research_data_json}', JSON.stringify(researchDataForOpus))
+      .replace('{research_data_json}', JSON.stringify(researchDataForOpus)) // Inject Haiku's research
       .replace('{website}', website)
       .replace(/{company}/g, companyNameFromUrl) 
-      .replace('{positioning_input}', positioning);
+      .replace('{positioning_input}', positioning); // User's input for positioning
       
     console.log(`Starting Claude Opus campaign generation for ${website} with extended thinking...`);
     console.time("ClaudeOpusGeneration");
 
     const opusCallOptions = {
       model: 'claude-opus-4-20250514',
-      max_tokens: 4000,
-      temperature: 0.7, // Standard temperature for creative generation
+      max_tokens: 4000, 
       messages: [{ role: 'user', content: finalPromptForOpus }],
-      // No tools needed for Opus here, it's just generating based on Haiku's research
+      // No 'tools' for Opus here, it's using Haiku's research.
     };
 
-    // Enable extended thinking for Opus
-    // Based on your research: extra_headers: {"anthropic-beta": "interleaved-thinking-2025-05-14"}
-    // The Node SDK might handle this via a top-level `thinking` parameter or in `anthropic.messages.create({}, { headers: ... })`
-    // Let's try the standard `thinking` parameter first as it's cleaner if supported by the SDK version for this.
-    // If this specific way of enabling thinking causes an API error, we might need to use `extra_headers` if the SDK allows.
-    opusCallOptions.thinking = {
-        "type": "enabled",
-        "budget_tokens": 10000 // Budget for Opus's thinking/generation refinement
-    };
-    // If using extra_headers:
-    // const opusResponse = await anthropicClient.messages.create(opusCallOptions, {
-    //   headers: { "anthropic-beta": "interleaved-thinking-2025-05-14" }
-    // });
-
+    const enableThinkingForOpus = true; 
+    if (enableThinkingForOpus) {
+      opusCallOptions.thinking = {
+          "type": "enabled",
+          "budget_tokens": 10000 
+      };
+      opusCallOptions.temperature = 1.0; // Temperature MUST be 1.0 if thinking is enabled
+      console.log("Extended thinking enabled for Opus with temperature 1.0.");
+    } else {
+      opusCallOptions.temperature = 0.7; // Original temperature if thinking is off
+      console.log("Extended thinking disabled for Opus, temperature 0.7.");
+    }
+    
     const opusResponse = await anthropicClient.messages.create(opusCallOptions);
-
     console.timeEnd("ClaudeOpusGeneration");
 
-    const opusOutputText = opusResponse.content[0].text;
+    const opusOutputText = (opusResponse.content && opusResponse.content.length > 0 && typeof opusResponse.content[0].text === 'string') ? opusResponse.content[0].text : '';
     console.log("Raw Claude Opus output (first 300 chars):", opusOutputText.substring(0,300));
     
     let finalAnalysisJson = safeJsonParse(opusOutputText, "ClaudeOpusOutput");
@@ -445,17 +465,18 @@ export async function POST(req) {
         companyName: companyNameFromUrl, 
         website: website,
         positioningInput: positioning,
-        // The 'analysis' key now holds the final JSON from Opus, which includes its interpretation of Haiku's research
-        analysis: finalAnalysisJson 
+        analysis: finalAnalysisJson // This now contains everything for the frontend
       }
     });
 
   } catch (error) {
     console.error('API Error in POST function:', error);
-    if (error.response && error.response.data) {
+    if (error.response && error.response.data) { // Anthropic API errors
         console.error('Anthropic API Error Details:', JSON.stringify(error.response.data, null, 2));
+    } else if (error.status && error.message) { // Generic fetch-like errors
+        console.error(`API Call Error: ${error.status} ${error.message}`);
     }
-    return Response.json({ success: false, error: 'Failed to generate analysis. Please try again.' }, { status: 500 });
+    return Response.json({ success: false, error: 'Failed to generate analysis due to an API error. Please try again.' }, { status: 500 });
   }
 }
 
