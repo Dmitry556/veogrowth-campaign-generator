@@ -75,7 +75,7 @@ async function performClaudeHaikuResearch(website, researchObjective) {
   const companyNameFromUrl = website.replace(/https?:\/\//, "").replace("www.", "").split("/")[0];
   const prompt = researchObjective.content
     .replace("{website}", website)
-    .replace(/{company}/g, companyNameFromUrl);
+    .replace(/{company}/g, companyNameFromUrl); 
 
   console.log(`Starting Haiku research: ${researchObjective.promptName} for ${website}`);
   console.time(researchObjective.promptName);
@@ -84,7 +84,7 @@ async function performClaudeHaikuResearch(website, researchObjective) {
   try {
     const response = await anthropicClient.messages.create({
       model: "claude-3-5-haiku-latest", 
-      max_tokens: 2000, // Increased slightly for Haiku for tool use + JSON
+      max_tokens: 2000, 
       messages: [{ role: "user", content: prompt }],
       tools: [{
         "type": "web_search_20250305",
@@ -103,7 +103,7 @@ async function performClaudeHaikuResearch(website, researchObjective) {
       if (finalJsonString) {
         console.log(`Haiku research ${researchObjective.promptName} - final text block (first 100): ${finalJsonString.substring(0, 100)}`);
       } else {
-        console.warn(`Haiku research ${researchObjective.promptName} for ${website} did not produce a final text block after tool use. Content:`, JSON.stringify(response.content.slice(-2), null, 2)); // Log last 2 content blocks
+        console.warn(`Haiku research ${researchObjective.promptName} for ${website} did not produce a final text block after tool use. Content:`, JSON.stringify(response.content.slice(-2), null, 2)); 
         finalJsonString = JSON.stringify({ error: `Haiku did not produce a final text JSON for ${researchObjective.promptName} after tool interactions.` });
       }
     } else {
@@ -115,7 +115,7 @@ async function performClaudeHaikuResearch(website, researchObjective) {
     return safeJsonParse(finalJsonString, researchObjective.promptName);
 
   } catch (error) {
-    console.timeEnd(researchObjective.promptName); // Ensure timeEnd is called
+    console.timeEnd(researchObjective.promptName); 
     console.error(`Error during Haiku research (${researchObjective.promptName}) for ${website}:`, error);
     const errorDetails = error.message ? error.message : "Unknown error during Haiku research";
     return safeJsonParse(JSON.stringify({ error: `Failed Haiku research for ${researchObjective.promptName}`, details: errorDetails }), researchObjective.promptName);
@@ -262,10 +262,14 @@ Your entire output MUST be only the single JSON object. Adhere strictly to the d
 // --- Function to send email with analysis (uses final Claude Opus JSON) ---
 async function sendEmailReport(email, companyName, claudeAnalysisJson) {
   try {
-    // Basic HTML escaping for values going into the template
     const escapeHtml = (unsafe) => {
         if (typeof unsafe !== 'string') return '';
-        return unsafe.replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">").replace(/"/g, """).replace(/'/g, "'");
+        return unsafe
+             .replace(/&/g, "&")
+             .replace(/</g, "<")
+             .replace(/>/g, ">")
+             .replace(/"/g, """)
+             .replace(/'/g, "'");
     };
     
     const emailHtmlForUser = `
@@ -432,9 +436,12 @@ export async function POST(req) {
     console.log(`Starting Claude Opus campaign generation for ${website} with extended thinking...`);
     console.time("ClaudeOpusGeneration");
 
+    const opusThinkingBudget = 10000; // Define budget for thinking
+    const opusResponseTokens = 4000;  // Define desired output tokens
+
     const opusCallOptions = {
       model: 'claude-opus-4-20250514',
-      max_tokens: 14000, // budget_tokens (10000) + desired output (e.g., 4000)
+      max_tokens: opusThinkingBudget + opusResponseTokens, 
       messages: [{ role: 'user', content: finalPromptForOpus }],
     };
 
@@ -442,13 +449,13 @@ export async function POST(req) {
     if (enableThinkingForOpus) {
       opusCallOptions.thinking = {
           "type": "enabled",
-          "budget_tokens": 10000 // Example budget
+          "budget_tokens": opusThinkingBudget 
       };
-      opusCallOptions.temperature = 1.0; // Temperature MUST be 1.0 if thinking is enabled
+      opusCallOptions.temperature = 1.0; 
       console.log(`Extended thinking enabled for Opus. budget_tokens: ${opusCallOptions.thinking.budget_tokens}, max_tokens: ${opusCallOptions.max_tokens}, temperature: 1.0.`);
     } else {
-      opusCallOptions.temperature = 0.7; // Original temperature if thinking is off
-      // opusCallOptions.max_tokens = 4000; // Reset to original if thinking is off and a smaller max is desired
+      opusCallOptions.temperature = 0.7; 
+      opusCallOptions.max_tokens = opusResponseTokens; 
       console.log(`Extended thinking disabled for Opus. max_tokens: ${opusCallOptions.max_tokens}, temperature: 0.7.`);
     }
     
