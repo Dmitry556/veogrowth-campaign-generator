@@ -9,25 +9,36 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-// Initialize Google Gemini Client
+// Initialize Google Gemini Clients
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-let geminiResearchModel;
+let geminiProModel;
+let geminiFlashModel;
 
 if (GEMINI_API_KEY) {
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-  geminiResearchModel = genAI.getGenerativeModel({
-    model: "gemini-2.5-pro-preview-05-06", // Using your desired 2.5 Pro Preview model
-    // REMOVED: tools: [{ googleSearchRetrieval: {} }], - let's see if it uses search via prompt
+  
+  geminiProModel = genAI.getGenerativeModel({
+    model: "gemini-2.5-pro-preview-05-06", 
     safetySettings: [
       { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
       { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
       { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
       { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
     ],
-    generationConfig: {
-      temperature: 0.3,
-    }
+    generationConfig: { temperature: 0.3 }
   });
+
+  geminiFlashModel = genAI.getGenerativeModel({
+    model: "gemini-2.5-flash-preview-05-20", // Your confirmed Flash model
+    safetySettings: [ /* ... same safety settings ... */
+      { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+      { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+      { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+      { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+    ],
+    generationConfig: { temperature: 0.3 }
+  });
+
 } else {
   console.error("GEMINI_API_KEY is not set. Gemini research will be disabled.");
 }
@@ -35,40 +46,46 @@ if (GEMINI_API_KEY) {
 // Initialize Resend Client
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Helper function to perform research with Gemini
-async function performResearchWithGemini(website, researchPromptObject) {
+// Helper function to perform research with a specific Gemini model
+async function performResearchWithGemini(geminiModel, website, researchPromptObject) {
   const promptIdentifier = researchPromptObject.promptName || 'unknown_research';
   const promptText = researchPromptObject.content;
 
-  if (!geminiResearchModel) {
-    console.error(`Gemini model not initialized for "${promptIdentifier}" on ${website} because API key is missing.`);
-    return JSON.stringify({ error: `Gemini API key not configured for ${promptIdentifier}` });
+  if (!geminiModel) { // Check if the specific model instance is available
+    console.error(`Gemini model for "${promptIdentifier}" not initialized (API key missing or model init failed).`);
+    return JSON.stringify({ error: `Gemini model for ${promptIdentifier} not configured` });
   }
 
   try {
-    console.log(`Starting Gemini research for "${promptIdentifier}" on ${website} using model: ${geminiResearchModel.model}`);
+    // Get the model name from the model object for logging if possible, otherwise use a placeholder
+    const modelNameForLog = geminiModel.model || "unknown_gemini_model";
+    console.log(`Starting Gemini research for "${promptIdentifier}" on ${website} using model: ${modelNameForLog}`);
+    console.time(`${promptIdentifier}_${website}`);
+
 
     const fullPrompt = promptText
       .replace('{website}', website)
       .replace('{domain}', website.replace(/https?:\/\//, '').replace('www.', ''))
       .replace('{company}', website.replace(/https?:\/\//, '').replace('www.', '').split('/')[0]);
     
-    const result = await geminiResearchModel.generateContent(fullPrompt);
+    const result = await geminiModel.generateContent(fullPrompt);
     const response = result.response;
 
      if (!response || !response.candidates || response.candidates.length === 0 || !response.candidates[0].content || !response.candidates[0].content.parts || response.candidates[0].content.parts.length === 0) {
       const blockReason = response?.promptFeedback?.blockReason || 'No content returned';
       const safetyRatings = response?.promptFeedback?.safetyRatings || 'N/A';
       console.warn(`Gemini research for "${promptIdentifier}" on ${website} returned no content or was blocked. Reason: ${blockReason}. Safety Ratings: ${JSON.stringify(safetyRatings)}`);
+      console.timeEnd(`${promptIdentifier}_${website}`);
       return JSON.stringify({ error: `Gemini returned no content or was blocked for ${promptIdentifier}. Reason: ${blockReason}` });
     }
     
     const researchOutputText = response.text();
-    
-    console.log(`Gemini research for "${promptIdentifier}" on ${website} completed. Output (first 100 chars): ${researchOutputText.substring(0,100)}`);
+    console.timeEnd(`${promptIdentifier}_${website}`);
+    console.log(`Gemini research for "${promptIdentifier}" on ${website} (model: ${modelNameForLog}) completed in ${console.timeLog ? '' : 'N/A'}ms. Output (first 100 chars): ${researchOutputText.substring(0,100)}`);
     return researchOutputText;
 
   } catch (error) {
+    console.timeEnd(`${promptIdentifier}_${website}`);
     console.error(`Error during Gemini research for "${promptIdentifier}" on ${website}:`, error);
     let errorMessage = error.message;
     if (error.errorDetails) { 
@@ -148,60 +165,43 @@ Ensure all string values are properly escaped within the JSON.
 </output_instructions>
 </homepage_analysis_task>`
   },
-  caseStudies: {
+  caseStudies: { // This is the "Metrics-First WITH More Context" version
     promptName: "CaseStudyAnalysis",
     content: `<case_study_search_task>
-You are an expert market researcher. Find customer success stories, case studies, and testimonials for the company {company} at {website}.
-Use your web search tool extensively. Search for things like:
-- "{company} case studies"
-- "{company} customer success stories"
-- "{domain} testimonials"
-- "{domain} reviews"
-- "site:{domain} client results"
-- "{company} helped [common industry problem]"
+You are an expert market researcher. Your primary goal is to find **up to 2-3** distinct customer success stories or case studies for {company} at {website} that clearly articulate the customer's problem, the solution provided by {company}, and showcase **quantifiable results or specific, measurable achievements.**
 
-Follow links found in search results to gather detailed information.
+Use your web search tool. Focus on finding official case studies or detailed customer stories. Search for:
+- "{company} case study problem solution results"
+- "{company} customer success metrics"
+- "{domain} client impact story"
 
-<extraction_focus>
-<customer_evidence>
-- List every distinct customer COMPANY name mentioned in case studies or testimonials.
-- For each customer, summarize specific, quantifiable results or metrics achieved (e.g., "20% increase in X", "50 hours saved").
-- Note the industry of each customer, if available.
-- Note the size of the customer company (e.g., SMB, Fortune 500), if mentioned.
-- Extract 1-2 impactful direct quotes per case study (attribute to the company, not individuals).
-</customer_evidence>
-<success_metrics>
-- Common types of percentage improvements reported (e.g., "revenue increase", "cost reduction").
-- Typical time savings or efficiency gains mentioned.
-- ROI figures or cost reduction claims.
-</success_metrics>
-<testimonial_themes>
-- What are the most common praise points or benefits highlighted by customers?
-- What specific problems do customers say {company} solved for them?
-</testimonial_themes>
-</extraction_focus>
+For each of the (up to) 2-3 best examples you find:
+1.  Identify the customer's COMPANY name.
+2.  Briefly describe the **customer's primary problem or pain point** before using {company}'s solution (1-2 sentences).
+3.  Briefly describe **how {company}'s product/service provided the solution** (1-2 sentences).
+4.  Extract the **most significant quantifiable result(s)** or specific measurable achievement(s) resulting from the solution. (e.g., "Increased revenue by 25%", "Reduced operational costs by $50,000 annually", "Improved user engagement by 40%", "Cut processing time from 10 hours to 2 hours"). Be specific.
+5.  (Optional) If a concise, impactful quote from the customer COMPANY directly supports the problem, solution, or results, include a short snippet.
 
 <output_format>
 Return your analysis *ONLY* as a single, minified JSON object with these exact keys. Do not include any other text or explanations before or after the JSON.
 {
-  "customers_found": ["company_name1", "company_name2"],
-  "case_studies_summary": [
+  "detailed_case_studies": [ 
+    /* Array of 0 to 3 case study objects. If 0, this array is empty. */
+    /* Example of one object if found:
     {
-      "customer_name": "",
-      "industry": "",
-      "results_summary": "", /* Brief summary of key results/metrics */
-      "quote": "" /* A compelling quote */
+      "customer_name": "ExampleCorp",
+      "problem_faced": "Struggled with inefficient manual data processing across multiple departments, leading to delays and errors.",
+      "solution_provided_by_company": "{company}'s platform automated their data workflows and provided a centralized dashboard for real-time insights.",
+      "quantifiable_results_achieved": ["Reduced data processing time by 70%", "Improved data accuracy by 95% within 3 months"],
+      "supporting_quote_snippet": "This transformed our operations, freeing up valuable team resources. - COO, ExampleCorp" 
     }
+    */
   ],
-  "common_success_metrics": { /* Aggregated themes */
-    "percentage_improvements_themes": [], /* e.g., "Increased efficiency by X%" */
-    "time_savings_themes": [],
-    "roi_or_cost_reduction_themes": []
-  },
-  "testimonial_themes_summary": [], /* e.g., "Easy to use", "Solved X problem effectively" */
-  "evidence_quality": "strong/moderate/weak/none" /* Assess based on availability and specificity of evidence found */
+  "search_summary_notes": "" /* e.g., "Found 2 detailed case studies with clear metrics and context." or "Limited detailed case studies found; some customer logos/testimonials without full context available." or "No comprehensive case studies discovered after searching." */
 }
-If no specific case studies or testimonials are found, return empty arrays and "evidence_quality" as "none".
+If you cannot find any case studies that clearly outline the problem, solution, and **quantifiable results** after a reasonable search, return an empty "detailed_case_studies" array and reflect this in the "search_summary_notes".
+Your focus is on a balanced narrative: problem, solution, and **concrete, measurable impact.**
+Do not spend excessive time if initial focused searches do not yield well-rounded case studies. Aim for quality over quantity.
 Ensure all string values are properly escaped within the JSON.
 </output_format>
 </case_study_search_task>`
@@ -277,7 +277,7 @@ NEVER FORGET RULES:
 3. Always use periods between sentences, never dashes
 4. Never start observations with "noticed" or "saw" - jump straight to the fact
 5. Make every observable fact specific and publicly findable
-6. If no case studies found (based on Research Data.caseStudies.evidence_quality === "none"), ALWAYS add the warning note
+6. If (!ResearchData.caseStudies.detailed_case_studies || ResearchData.caseStudies.detailed_case_studies.length === 0 || (ResearchData.caseStudies.search_summary_notes && ResearchData.caseStudies.search_summary_notes.toLowerCase().includes("no") && ResearchData.caseStudies.search_summary_notes.toLowerCase().includes("case studies"))), ALWAYS add the warning note for social proof.
 7. Target segments must be large (1,000+ prospects minimum)
 8. When focusing on personalization, don't forget natural vivid imagery
 9. For agencies: ALWAYS include specific execution details and valuable offers
@@ -294,24 +294,24 @@ Generate output following this EXACT structure:
 Based on [Company]'s website analysis:
 
 ## **Positioning Assessment: [✅ CLEAR / ⚠️ MODERATELY CLEAR / ❌ UNCLEAR]**
-[1-2 sentences explaining why, mentioning specific strengths or gaps based on Research Data.homepage.positioning_strength and your analysis of Research Data.homepage]
+[1-2 sentences explaining why, mentioning specific strengths or gaps based on ResearchData.homepage.positioning_strength and your analysis of ResearchData.homepage]
 
 ---
 
 ## **Your ICP appears to be:**
-- **Industry**: [Specific verticals based on Research Data.homepage.target_audience.industries or your inference]
-- **Company size**: [Employee count/revenue based on Research Data.homepage.target_audience.company_sizes or Research Data.marketContext.company_growth_signals]
+- **Industry**: [Specific verticals based on ResearchData.homepage.target_audience.industries or your inference]
+- **Company size**: [Employee count/revenue based on ResearchData.homepage.target_audience.company_sizes or ResearchData.marketContext.company_growth_signals]
 - **Key characteristics**:
-  - [Specific pain point from Research Data.marketContext.pain_points_addressed_by_company or inferred from Research Data.homepage.product]
+  - [Specific pain point from ResearchData.marketContext.pain_points_addressed_by_company or inferred from ResearchData.homepage.product]
   - [Another specific pain point or situation]
-  - [Use case from Research Data.homepage.target_audience.use_cases]
-  - [Characteristic related to Research Data.homepage.features]
-  - [Characteristic related to Research Data.marketContext.relevant_market_trends if available]
+  - [Use case from ResearchData.homepage.target_audience.use_cases]
+  - [Characteristic related to ResearchData.homepage.features]
+  - [Characteristic related to ResearchData.marketContext.relevant_market_trends if available]
 
 ## **Key Personas to Target:**
 
-**1. [Specific Title based on Research Data.homepage.target_audience.job_titles or common for the ICP]**
-- Pain points: [Comma-separated list of 3-4 specific challenges relevant to this persona and the Research Data]
+**1. [Specific Title based on ResearchData.homepage.target_audience.job_titles or common for the ICP]**
+- Pain points: [Comma-separated list of 3-4 specific challenges relevant to this persona and the ResearchData]
 
 **2. [Different Title]**
 - Pain points: [Comma-separated list of 3-4 specific challenges]
@@ -324,32 +324,32 @@ Based on [Company]'s website analysis:
 ## **Campaign Ideas for [Company]:**
 
 ### **Campaign 1: "[Descriptive Name]"**
-**Target**: [Specific role] at [specific company type with observable characteristic, informed by Research Data]
+**Target**: [Specific role] at [specific company type with observable characteristic, informed by ResearchData]
 **Example email:**
-"Hi [Name], [specific observable fact about prospect company, try to relate to Research Data.homepage.product or Research Data.marketContext.pain_points_addressed_by_company]. [Natural insight or vivid pain point]. [Company] helped [IF Research Data.caseStudies.case_studies_summary is NOT empty, use a customer_name from there, ELSE use a plausible generic customer type like 'a similar company'] [IF Research Data.caseStudies.case_studies_summary is NOT empty, use a result_summary or quote from there, ELSE use a plausible benefit related to Research Data.homepage.product]. [Conversational CTA ending in ?]"
+"Hi [Name], [specific observable fact about prospect company, try to relate to ResearchData.homepage.product or ResearchData.marketContext.pain_points_addressed_by_company]. [Natural insight or vivid pain point]. [Company] helped [IF ResearchData.caseStudies.detailed_case_studies && ResearchData.caseStudies.detailed_case_studies.length > 0, use ResearchData.caseStudies.detailed_case_studies[0].customer_name, ELSE use 'a leading company in their space'] achieve [IF ResearchData.caseStudies.detailed_case_studies && ResearchData.caseStudies.detailed_case_studies.length > 0, pick a key result from ResearchData.caseStudies.detailed_case_studies[0].quantifiable_results_achieved.join(' and ') or describe the benefit from 'problem_faced' being solved by 'solution_provided_by_company', ELSE describe a plausible benefit related to ResearchData.homepage.product]. [Conversational CTA ending in ?]"
 
 ### **Campaign 2: "[Different Name]"**
 **Target**: [Different specific role] at [different segment]
 **Example email:**
-"Hi [Name], [different observable fact]. [Different insight or pain point]. [Company]'s [mechanism from Research Data.homepage.mechanism or a key feature from Research Data.homepage.features] [achieves outcome related to Research Data.homepage.value_props]. [IF Research Data.caseStudies.case_studies_summary has another example, use it. ELSE, use a general benefit statement]. [Different conversational CTA?]"
+"Hi [Name], [different observable fact]. [Different insight or pain point]. [Company]'s [mechanism from ResearchData.homepage.mechanism or a key feature from ResearchData.homepage.features] [achieves outcome related to ResearchData.homepage.value_props]. [IF ResearchData.caseStudies.detailed_case_studies && ResearchData.caseStudies.detailed_case_studies.length > 1, use customer_name and a key result from ResearchData.caseStudies.detailed_case_studies[1], ELSE IF ResearchData.caseStudies.detailed_case_studies && ResearchData.caseStudies.detailed_case_studies.length > 0, re-iterate the first case study or use its supporting_quote_snippet, ELSE use a general benefit statement]. [Different conversational CTA?]"
 
 ### **Campaign 3: "[Another Name]"**
 **Target**: [Third role] at [third segment]
 **Example email:**
-"Hi [Name], [third observable fact, perhaps related to Research Data.marketContext.main_competitors_identified if available]. [Third insight or pain point]. [Solution connection using Research Data.homepage.product/features]. [IF Research Data.caseStudies.case_studies_summary has a third example, use it. ELSE, use another general benefit statement]. [Third CTA?]"
+"Hi [Name], [third observable fact, perhaps related to ResearchData.marketContext.main_competitors_identified if available]. [Third insight or pain point]. [Solution connection using ResearchData.homepage.product/features]. [IF ResearchData.caseStudies.detailed_case_studies && ResearchData.caseStudies.detailed_case_studies.length > 2, use customer_name and a key result from ResearchData.caseStudies.detailed_case_studies[2], ELSE IF ResearchData.caseStudies.detailed_case_studies && ResearchData.caseStudies.detailed_case_studies.length > 0, use a general benefit statement or a different aspect of an earlier case study]. [Third CTA?]"
 
 ---
 
-[IF Research Data.caseStudies.evidence_quality is "none" or Research Data.caseStudies.case_studies_summary is empty, ADD THIS:]
+[IF !ResearchData.caseStudies.detailed_case_studies || ResearchData.caseStudies.detailed_case_studies.length === 0 || (ResearchData.caseStudies.search_summary_notes && (ResearchData.caseStudies.search_summary_notes.toLowerCase().includes("no clear case studies") || ResearchData.caseStudies.search_summary_notes.toLowerCase().includes("limited detailed case studies")  || ResearchData.caseStudies.search_summary_notes.toLowerCase().includes("no comprehensive case studies"))), ADD THIS:]
 ### ⚠️ **Note on Social Proof**: 
-*Our AI research (leveraging Google Search via Gemini) could not find specific customer case studies or detailed testimonials for {website} in the structured format required. The examples above may use hypothetical scenarios or generalized benefits based on the company's product description. When we work together, you'll provide us with your real customer success stories, metrics, and testimonials to make these campaigns authentic and powerful.*
+*Our AI research (leveraging Google Search via Gemini) found limited or no detailed customer case studies with specific quantifiable metrics for {website}. The AI research notes: "{ResearchData.caseStudies.search_summary_notes}". The examples above may use hypothetical scenarios or generalized benefits based on the company's product description. When we work together, you'll provide us with your real customer success stories, metrics, and testimonials to make these campaigns authentic and powerful.*
 
 **Want VeoGrowth to execute these campaigns?**  
 We'll [specific action related to their ICP] and [specific outcome related to their value prop].
 
 [Book a Strategy Call →]
 
-*Note: These campaigns would target approximately [X,000-Y,000] qualified prospects [specific description of who and why they're qualified, informed by Research Data].*
+*Note: These campaigns would target approximately [X,000-Y,000] qualified prospects [specific description of who and why they're qualified, informed by ResearchData].*
 
 ---
 EXAMPLE 1 - SaaS with Clear Positioning (IXON):
@@ -754,17 +754,22 @@ export async function POST(req) {
 
     console.log('New lead:', { email, website, positioning, timestamp: new Date() });
 
-    if (!GEMINI_API_KEY || !geminiResearchModel) {
-        console.error("Critical: GEMINI_API_KEY not configured or model failed to initialize. Aborting research.");
-        return Response.json({ success: false, error: 'Research module not configured (API Key missing).' }, { status: 500 });
+    if (!GEMINI_API_KEY || !geminiProModel || !geminiFlashModel) { // Check both models
+        console.error("Critical: GEMINI_API_KEY not configured or one or more Gemini models failed to initialize. Aborting research.");
+        return Response.json({ success: false, error: 'Research module not configured (API Key or model init issue).' }, { status: 500 });
     }
 
-    // Run three research prompts in parallel with Gemini
+    // Run research tasks in PARALLEL
+    // Homepage and MarketContext use Pro model
+    // CaseStudies use Flash model
+    console.log(`Starting PARALLEL Gemini research for ${website}...`);
     const [homepageDataString, caseStudyDataString, marketDataString] = await Promise.all([
-      performResearchWithGemini(website, RESEARCH_PROMPTS.homepage),
-      performResearchWithGemini(website, RESEARCH_PROMPTS.caseStudies),
-      performResearchWithGemini(website, RESEARCH_PROMPTS.marketContext)
+      performResearchWithGemini(geminiProModel, website, RESEARCH_PROMPTS.homepage),
+      performResearchWithGemini(geminiFlashModel, website, RESEARCH_PROMPTS.caseStudies), // Use Flash model here
+      performResearchWithGemini(geminiProModel, website, RESEARCH_PROMPTS.marketContext)
     ]);
+    console.log(`All PARALLEL Gemini research completed for ${website}.`);
+
 
     // Combine research results safely
     const combinedResearch = {
@@ -785,13 +790,14 @@ export async function POST(req) {
       .replace('{website}', website)
       .replace('{positioning}', positioningAssessment);
     
+    console.time("ClaudeGeneration");
     const claudeResponse = await anthropic.messages.create({
       model: 'claude-opus-4-20250514',
       max_tokens: 4000,
       temperature: 0.7,
       messages: [{ role: 'user', content: finalClaudePrompt }]
     });
-
+    console.timeEnd("ClaudeGeneration");
     const analysis = claudeResponse.content[0].text;
 
     const companyNameFromUrl = website.replace(/https?:\/\//, '').replace('www.', '').split('/')[0];
@@ -816,33 +822,25 @@ export async function POST(req) {
                 if (!match.endsWith('</div>')) emailContent += '</div>'; 
                 return p1 + emailContent;
             })
-            .replace(/### ⚠️ \*\*Note on Social Proof\*\*:/g, (match) => { // Adjusted this regex to be more robust
-                let prefix = '</div>'; // Assume previous was an email example, needs closing
+            .replace(/### ⚠️ \*\*Note on Social Proof\*\*:/g, (match) => { 
+                let prefix = '</div>'; 
                 const analysisUpToMatch = analysis.substring(0, analysis.indexOf(match));
                 const openCampaignBlock = analysisUpToMatch.lastIndexOf('<div style="background: #f3f4f6');
                 const openEmailBlock = analysisUpToMatch.lastIndexOf('<div style="background: white');
-                
                 if (openCampaignBlock > openEmailBlock && !analysisUpToMatch.substring(openCampaignBlock).includes('</div>')) {
-                    // If campaign block is open and email block is not more recent or is closed
-                     prefix = '</div></div>'; // Close email and campaign block
+                     prefix = '</div></div>'; 
                 } else if (openEmailBlock > openCampaignBlock && !analysisUpToMatch.substring(openEmailBlock).includes('</div>')) {
-                    // This case should be handled by the previous regex, but as a fallback
-                    prefix = '</div>'; // Close email block
+                    prefix = '</div>';
                 }
-
-
                 return prefix + '<div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 16px; border-radius: 8px; margin: 32px 0;"><h4 style="color: #92400e; margin: 0 0 8px 0;">⚠️ Note on Social Proof:</h4>';
             })
-            .replace(/\*\*Want VeoGrowth to execute these campaigns\?\*\*/g, (match) => { // Adjusted this regex
+            .replace(/\*\*Want VeoGrowth to execute these campaigns\?\*\*/g, (match) => { 
                 let prefix = '';
                 const analysisUpToMatch = analysis.substring(0, analysis.indexOf(match));
-
-                // Check if the social proof div was the last thing and needs closing
                 const openSocialProofBlock = analysisUpToMatch.lastIndexOf('<div style="background: #fef3c7');
                 if (openSocialProofBlock !== -1 && !analysisUpToMatch.substring(openSocialProofBlock).includes('</div>')) {
                     prefix = '</div>';
                 } else {
-                    // Default: assume an email example or campaign block might need closing
                     const openCampaignBlock = analysisUpToMatch.lastIndexOf('<div style="background: #f3f4f6');
                     const openEmailBlock = analysisUpToMatch.lastIndexOf('<div style="background: white');
                     if (openCampaignBlock > openEmailBlock && !analysisUpToMatch.substring(openCampaignBlock).includes('</div>')) {
