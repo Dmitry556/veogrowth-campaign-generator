@@ -265,11 +265,11 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
     const escapeHtml = (unsafe) => {
         if (typeof unsafe !== 'string') return '';
         return unsafe
-             .replace(/&/g, "&")
-             .replace(/</g, "<")
-             .replace(/>/g, ">")
-             .replace(/"/g, """)
-             .replace(/'/g, "'"); // Corrected HTML entity for single quote
+             .replace(/&/g, "&")      // This one is fine
+             .replace(/</g, "<")       // This one is fine
+             .replace(/>/g, ">")       // This one is fine
+             .replace(/"/g, """)  // THIS IS FINE
+             .replace(/'/g, "'"); // THIS IS FINE
     };
     
     const emailHtmlForUser = `
