@@ -269,7 +269,7 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
              .replace(/</g, "<")
              .replace(/>/g, ">")
              .replace(/"/g, """)
-             .replace(/'/g, "'");
+             .replace(/'/g, "'"); // Corrected HTML entity for single quote
     };
     
     const emailHtmlForUser = `
@@ -436,8 +436,8 @@ export async function POST(req) {
     console.log(`Starting Claude Opus campaign generation for ${website} with extended thinking...`);
     console.time("ClaudeOpusGeneration");
 
-    const opusThinkingBudget = 10000; // Define budget for thinking
-    const opusResponseTokens = 4000;  // Define desired output tokens
+    const opusThinkingBudget = 10000; 
+    const opusResponseTokens = 4000;  
 
     const opusCallOptions = {
       model: 'claude-opus-4-20250514',
@@ -469,6 +469,9 @@ export async function POST(req) {
 
     if (finalAnalysisJson.error) {
         console.error("Claude Opus did not return valid JSON. Raw output snippet:", opusOutputText.substring(0, 1000));
+        // If parsing fails, we still want to send an email, but with an error message or the raw text for debugging
+        const errorEmailHtml = `<h1>Analysis Generation Failed</h1><p>Could not parse the AI's response. Raw output snippet:</p><pre>${escapeHtml(opusOutputText.substring(0,2000))}</pre>`;
+        await sendEmailReport(email, companyNameFromUrl, { error: "AI_OUTPUT_PARSE_ERROR", raw_snippet: opusOutputText.substring(0,2000), positioningAssessmentOutput: errorEmailHtml }); // Send a modified payload or just error
         return Response.json({ success: false, error: "Failed to parse final analysis from AI.", debug_opus_output_snippet: opusOutputText.substring(0, 1000) }, { status: 500 });
     }
     
