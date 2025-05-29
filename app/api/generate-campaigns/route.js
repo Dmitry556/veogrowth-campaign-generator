@@ -11,23 +11,29 @@ const anthropic = new Anthropic({
 
 // Initialize Google Gemini Client
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const geminiResearchModel = genAI.getGenerativeModel({
-  model: "gemini-1.5-pro-latest", // Using 1.5 Pro as "2.5 Pro" might not be generally available via this exact identifier yet. 1.5 Pro is very capable.
-  tools: [{ // This enables the built-in Google Search tool for grounding
-    googleSearchRetrieval: {} // Empty object for default behavior
-  }],
-  safetySettings: [
-    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-  ],
-  generationConfig: {
-    temperature: 0.3, // Lower temperature for more factual/deterministic research output
-    // responseMimeType: "application/json", // If Gemini supports this for enforcing JSON output directly
-  }
-});
+let geminiResearchModel;
+
+if (GEMINI_API_KEY) {
+  const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+  geminiResearchModel = genAI.getGenerativeModel({
+    // Using the specific date-versioned 2.5 Pro Preview model
+    model: "gemini-2.5-pro-preview-05-06", // <--- THIS IS THE CORRECTED LINE
+    tools: [{
+      googleSearchRetrieval: {} 
+    }],
+    safetySettings: [
+      { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+      { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+      { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+      { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+    ],
+    generationConfig: {
+      temperature: 0.3,
+    }
+  });
+} else {
+  console.error("GEMINI_API_KEY is not set. Gemini research will be disabled.");
+}
 
 
 // Initialize Resend Client
@@ -35,37 +41,46 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Helper function to perform research with Gemini and its search tool
 async function performResearchWithGemini(website, researchPromptObject) {
-  const promptIdentifier = researchPromptObject.promptName || 'unknown_research'; // Get a name for logging
+  const promptIdentifier = researchPromptObject.promptName || 'unknown_research';
   const promptText = researchPromptObject.content;
 
+  if (!geminiResearchModel) {
+    console.error(`Gemini model not initialized for "${promptIdentifier}" on ${website} because API key is missing.`);
+    return JSON.stringify({ error: `Gemini API key not configured for ${promptIdentifier}` });
+  }
+
   try {
-    console.log(`Starting Gemini research for "${promptIdentifier}" on ${website}`);
+    console.log(`Starting Gemini research for "${promptIdentifier}" on ${website} using model: ${geminiResearchModel.model}`);
 
     const fullPrompt = promptText
       .replace('{website}', website)
       .replace('{domain}', website.replace(/https?:\/\//, '').replace('www.', ''))
-      .replace('{company}', website.replace(/https?:\/\//, '').replace('www.', '').split('/')[0]); // Add {company} replacement
-
-    // Note: The RESEARCH_PROMPTS themselves instruct Gemini to return JSON.
-    // We are relying on Gemini's instruction-following for this.
-    // If Gemini supports response_mime_type: "application/json" in generationConfig, that's even better.
-    // For now, let's assume it follows the prompt's JSON instruction.
+      .replace('{company}', website.replace(/https?:\/\//, '').replace('www.', '').split('/')[0]);
     
     const result = await geminiResearchModel.generateContent(fullPrompt);
     const response = result.response;
+
+     if (!response || !response.candidates || response.candidates.length === 0 || !response.candidates[0].content || !response.candidates[0].content.parts || response.candidates[0].content.parts.length === 0) {
+      const blockReason = response?.promptFeedback?.blockReason || 'No content returned';
+      const safetyRatings = response?.promptFeedback?.safetyRatings || 'N/A';
+      console.warn(`Gemini research for "${promptIdentifier}" on ${website} returned no content or was blocked. Reason: ${blockReason}. Safety Ratings: ${JSON.stringify(safetyRatings)}`);
+      return JSON.stringify({ error: `Gemini returned no content or was blocked for ${promptIdentifier}. Reason: ${blockReason}` });
+    }
+    
     const researchOutputText = response.text();
     
     console.log(`Gemini research for "${promptIdentifier}" on ${website} completed. Output (first 100 chars): ${researchOutputText.substring(0,100)}`);
-    return researchOutputText; // This should be the JSON string if Gemini followed instructions
+    return researchOutputText;
 
   } catch (error) {
     console.error(`Error during Gemini research for "${promptIdentifier}" on ${website}:`, error);
-    // Check for specific Gemini API errors if available in the error object
-    if (error.response && error.response.data) {
-      console.error("Gemini API Error Details:", error.response.data);
+    let errorMessage = error.message;
+    if (error.errorDetails) { 
+        errorMessage += " Details: " + JSON.stringify(error.errorDetails);
+    } else if (error.response && error.response.data) {
+      errorMessage += " API Error Details: " + JSON.stringify(error.response.data);
     }
-    // Return a string that indicates failure but can be safely parsed by safeJsonParse later
-    return JSON.stringify({ error: `Failed Gemini research for ${promptIdentifier}`, details: error.message });
+    return JSON.stringify({ error: `Failed Gemini research for ${promptIdentifier}`, details: errorMessage });
   }
 }
 
@@ -84,7 +99,6 @@ function safeJsonParse(jsonString, promptName = "unknown") {
 }
 
 // --- RESEARCH PROMPTS (for Gemini) ---
-// These prompts instruct Gemini to use its search capabilities and return structured JSON.
 const RESEARCH_PROMPTS = {
   homepage: {
     promptName: "HomepageAnalysis",
@@ -251,7 +265,7 @@ Ensure all string values are properly escaped within the JSON.
   }
 };
 
-// --- CLAUDE'S METAPROMPT (largely unchanged, relies on {research} from Gemini) ---
+// --- CLAUDE'S METAPROMPT ---
 const METAPROMPT = `You are VeoGrowth's AI strategist analyzing a company's website to generate hyper-specific B2B cold email campaign ideas. You will produce EXACTLY the same format and quality as shown in the examples, with zero deviation.
 
 CRITICAL CONTEXT: VeoGrowth is an AI-powered lead generation agency that creates hyper-personalized cold email campaigns. We help companies book qualified meetings by understanding their prospects deeply and crafting messages that resonate.
@@ -342,18 +356,319 @@ We'll [specific action related to their ICP] and [specific outcome related to th
 *Note: These campaigns would target approximately [X,000-Y,000] qualified prospects [specific description of who and why they're qualified, informed by Research Data].*
 
 ---
-[Include ALL EXAMPLES from the original METAPROMPT here, unchanged, as they guide style and format]
 EXAMPLE 1 - SaaS with Clear Positioning (IXON):
-... [rest of example 1] ...
+
+Based on IXON's website analysis:
+
+## **Positioning Assessment: ✅ CLEAR**
+IXON has excellent positioning as an Industrial IoT platform specifically for machine builders, with clear value props around secure remote access, machine insights, and service efficiency.
+
+---
+
+## **Your ICP appears to be:**
+- **Industry**: Machine builders/OEMs (industrial equipment manufacturers)
+- **Company size**: 50-500 employees (mid-market manufacturers)
+- **Key characteristics**:
+  - Build complex industrial machines requiring remote support
+  - Have field service teams traveling to customer sites
+  - Face pressure to reduce service costs and improve uptime
+  - Need to comply with security standards (ISO, IEC, NIS2)
+  - Expanding globally with machines in multiple countries
+
+## **Key Personas to Target:**
+
+**1. VP of Service / Service Manager**
+- Pain points: High travel costs, slow response times, technician productivity, customer satisfaction
+
+**2. CTO / Head of Engineering**
+- Pain points: Security compliance, data collection from machines, building competitive advantages
+
+**3. Field Service Manager**
+- Pain points: Managing distributed technicians, reducing truck rolls, first-time fix rates
+
+---
+
+## **Campaign Ideas for IXON:**
+
+### **Campaign 1: "Travel Cost Crusher"**
+**Target**: VP of Service at machine builders with 10+ field technicians
+
+**Example email:**
+"Hi Mark, manufacturing packaging equipment with 15 field techs covering North America means travel probably eats 40% of service budget. IXON's secure remote access lets technicians fix issues from their desk. Repak cut on-site visits by 70%. Worth exploring?"
+
+### **Campaign 2: "Compliance Without Complexity"**
+**Target**: CTOs at machine builders selling to automotive/pharma
+
+**Example email:**
+"Hi Sarah, supplying assembly systems to automotive plants means facilities demand NIS2 and ISO compliance for any remote access. Most VPN solutions create security nightmares. IXON provides bank-grade security that IT departments actually approve. Vapormatt implemented without a single security audit finding. Interested?"
+
+### **Campaign 3: "First-Time Fix Rate Booster"**
+**Target**: Field Service Managers with global installations
+
+**Example email:**
+"Hi Tom, managing service for CNC machines across 30 countries means constant firefighting. When technicians arrive on-site without knowing the real issue, first-time fix rates plummet. IXON's Machine Insights showed HoSt exactly what's wrong before dispatch. They say troubleshooting speed increased 10x. Want to see how?"
+
+---
+
+**Want VeoGrowth to execute these campaigns?**  
+We'll build targeted lists of machine builders struggling with service costs and craft messages that resonate with their specific challenges.
+
+[Book a Strategy Call →]
+
+*Note: These campaigns would target approximately 3,000-5,000 qualified prospects across North America and Europe, focusing on mid-market manufacturers with distributed equipment.*
+
 EXAMPLE 2 - SaaS with Unclear Positioning (Tourmo):
-... [rest of example 2] ...
+
+Based on Tourmo.ai's website analysis:
+
+## **Positioning Assessment: ⚠️ MODERATELY CLEAR**
+Tourmo positions as an AI fleet management platform that integrates with existing systems, but the messaging covers many features without a single compelling focus. The "no rip and replace" angle is strong but gets lost among numerous capabilities.
+
+---
+
+## **Your ICP appears to be:**
+- **Industry**: Transportation, logistics, delivery, field service companies
+- **Company size**: 100-1000+ vehicle fleets
+- **Key characteristics**:
+  - Already invested in telematics/cameras but getting poor ROI
+  - Multiple disconnected fleet systems (fuel cards, cameras, telematics)
+  - Struggling with driver safety scores and false positives
+  - Manual processes eating up manager time
+  - Pressure to reduce accidents, fuel costs, and insurance premiums
+
+## **Key Personas to Target:**
+
+**1. VP of Fleet Operations**
+- Pain points: Too many systems to manage, poor data quality, can't prove ROI on fleet tech investments
+
+**2. Director of Safety**
+- Pain points: False positive alerts, reactive vs proactive coaching, insurance costs rising
+
+**3. Fleet Manager**
+- Pain points: Drowning in alerts, manual tasks, no time for strategic work
+
+---
+
+## **Campaign Ideas for Tourmo.ai:**
+
+### **Campaign 1: "The False Positive Eliminator"**
+**Target**: Fleet Safety Directors at companies with 200+ vehicles using Samsara/Motive
+
+**Example email:**
+"Hi Jessica, with 300 trucks running Samsara cameras, team probably reviews 50+ false hard-braking alerts daily. That's 10 hours weekly watching videos of coffee cups sliding. Tourmo's AI filters out 89% of false positives without replacing cameras. One logistics fleet freed up 3 safety managers for actual coaching. Want to stop the alert fatigue?"
+
+### **Campaign 2: "Hidden Fuel Theft Detector"**
+**Target**: CFOs at trucking companies with 500+ vehicles
+
+**Example email:**
+"Hi Robert, managing fuel for 500 trucks across multiple card providers means ghost transactions hide easily. Most fleets lose 2-3% to fuel fraud they never catch. Tourmo identifies suspicious transactions without changing fuel cards. [We'd insert your real customer metric here]. Interested in a fraud audit of your fuel data?"
+
+### **Campaign 3: "Fleet Tech ROI Rescue"**
+**Target**: VP Operations at companies with 3+ disconnected fleet systems
+
+**Example email:**
+"Hi David, running Geotab for tracking, Lytx for cameras, and WEX for fuel probably involves spreadsheet gymnastics every Monday. Meanwhile, the board questions why fleet tech costs $500K annually. Tourmo unifies existing systems and finally proves ROI. No hardware changes needed. Worth a conversation?"
+
+---
+
+### ⚠️ **Note on Social Proof**: 
+*We didn't find specific customer case studies on your website, so the examples above use hypothetical scenarios. When we work together, you'll provide us with your real customer success stories, metrics, and testimonials to make these campaigns authentic and powerful.*
+
+## **Positioning Recommendation:**
+Consider leading with ONE killer use case (like "Stop drowning in false positive alerts") rather than trying to communicate all capabilities upfront. The "no rip and replace" message is gold but needs to be tied to a specific, painful problem.
+
+**Want VeoGrowth to execute these campaigns?**  
+We'll build targeted lists of fleet managers already using your competitors' systems and craft messages that resonate with their specific tech stack challenges.
+
+[Book a Strategy Call →]
+
+*Note: These campaigns would target approximately 5,000-8,000 qualified prospects, focusing on fleets already invested in technology but struggling to get value from it.*
+
 EXAMPLE 3 - Agency with Hyper-Personalization:
-... [rest of example 3] ...
+
+Based on ConversionLab's website analysis:
+
+## **Positioning Assessment: ✅ CLEAR**
+ConversionLab has strong positioning as a CRO agency for ecommerce brands, with clear case studies showing specific conversion lifts and revenue gains for DTC brands.
+
+---
+
+## **Your ICP appears to be:**
+- **Industry**: Direct-to-consumer ecommerce brands
+- **Company size**: $5M-$50M annual revenue
+- **Key characteristics**:
+  - Decent traffic but conversion rates below 3%
+  - Selling on Shopify or similar platforms
+  - Have product-market fit but struggling to scale profitably
+  - Spending heavily on ads with rising CAC
+  - Know they need CRO but unsure where to start
+
+## **Key Personas to Target:**
+
+**1. Founder/CEO**
+- Pain points: Conversion rate plateaued, CAC rising, need to improve unit economics before raising
+
+**2. Head of Ecommerce/Digital**
+- Pain points: Pressure to hit revenue targets, too many optimization ideas, no clear testing roadmap
+
+**3. CMO/VP Marketing**
+- Pain points: Justifying ad spend, improving ROAS, competing priorities between acquisition and conversion
+
+---
+
+## **Campaign Ideas for ConversionLab:**
+
+### **Campaign 1: "The Conversion Audit Special"**
+**Target**: Ecommerce founders doing $10M+ with sub-3% conversion rates
+
+**Example email:**
+"Hi Mike, [Brand] converting at 2.3% with that beautiful product photography and story. Spent 20 minutes on your site - love how you showcase the sustainability angle. Few quick wins I spotted: your reviews sit below the fold (usually +15% moving them up), cart abandonment popup triggers too late (10 seconds vs optimal 3), and your size guide hides in footer (floating button typically +8% on apparel). Gymshark went from 2.1% to 3.8% with similar fixes. Want us to do a full 50-point audit video walking through every opportunity? Takes us 2 hours, completely free, you keep it forever. Interested?"
+
+### **Campaign 2: "The Holiday Revenue Maximizer"**
+**Target**: CMOs at DTC brands approaching Q4
+
+**Example email:**
+"Hi Sarah, [Brand]'s BFCM landing page from last year had smart countdown timers but checkout still took 4 steps. Noticed you're testing new bundles - smart move. For Black Friday, we'd suggest: single-page checkout (usually +22% conversion), exit intent with SMS capture (Glossier added $1.2M this way), and dynamic bundles based on cart value. We helped 12 brands average 47% more revenue last BFCM. Happy to share our exact 21-day pre-launch checklist and walk through how we'd customize it for [Brand]'s specific situation?"
+
+### **Campaign 3: "The Mobile Conversion Fix"**
+**Target**: Heads of Ecommerce seeing 70%+ mobile traffic
+
+**Example email:**
+"Hi Tom, [Brand]'s mobile experience actually loads fast (nice job on the 2.1s speed). But that sticky add-to-cart button disappears on your bestsellers page, and the image zoom makes products blurry on iPhone. Your competitor Allbirds fixed these exact issues and went from 1.8% to 3.2% mobile conversion. We've got a whole mobile playbook - thumb-friendly buttons, smart quick-buy options, Apple Pay optimization. Want to see a Loom video showing exactly what we'd fix on [Brand]'s mobile experience and expected conversion lift for each change?"
+
+---
+
+**Want VeoGrowth to execute these campaigns?**  
+We'll identify ecommerce brands with traffic but poor conversion and show them exactly how to turn more visitors into customers.
+
+[Book a Strategy Call →]
+
+*Note: These campaigns would target approximately 4,000-6,000 qualified DTC brands doing $5M+ revenue, focusing on those with conversion optimization opportunities.*
+
 EXAMPLE 4 - SEO Agency with Specific Execution:
-... [rest of example 4] ...
+
+Based on RankRise's website analysis:
+
+## **Positioning Assessment: ✅ CLEAR**
+RankRise specializes in SEO for B2B SaaS companies, with strong case studies showing organic traffic growth and pipeline attribution.
+
+---
+
+## **Your ICP appears to be:**
+- **Industry**: B2B SaaS companies
+- **Company size**: Series A to Series C (20-200 employees)
+- **Key characteristics**:
+  - Creating good content but not ranking
+  - Competitors dominating search results
+  - No clear SEO strategy beyond "write more blogs"
+  - Marketing team stretched thin
+  - Need to show organic pipeline contribution
+
+## **Key Personas to Target:**
+
+**1. VP/Director of Marketing**
+- Pain points: SEO takes forever to show results, hard to justify investment, competing priorities
+
+**2. Head of Content/Demand Gen**
+- Pain points: Great content buried on page 3, no technical SEO knowledge, keyword research guesswork
+
+**3. Founder/CEO (smaller companies)**
+- Pain points: Losing deals to competitors who rank, organic as sustainable growth channel, limited budget
+
+---
+
+## **Campaign Ideas for RankRise:**
+
+### **Campaign 1: "The Competitor Gap Analysis"**
+**Target**: Marketing directors at B2B SaaS losing organic traffic to competitors
+
+**Example email:**
+"Hi Sarah, Ahrefs shows [Competitor] ranking for 847 keywords that [Company] could own. They're getting ~12K visitors monthly from terms like "employee scheduling software" and "shift planning tools." Your blog content is actually deeper - especially that piece on schedule optimization. You're missing: dedicated comparison pages (/vs-when-i-work), a glossary section for definition searches, and integration pages for your top 10 partners. Scheduling software company Homebase built these exact pages and went from position 19 to top 3 in 4 months. Want me to run a full gap analysis showing which 20 pages would capture the most traffic from [Competitor]?"
+
+### **Campaign 2: "The Technical SEO Quick Wins"**
+**Target**: SaaS companies with 100+ blog posts but poor rankings
+
+**Example email:**
+"Hi Mark, [Company] has 200+ quality blog posts but Screaming Frog shows 1,400 technical issues holding you back. The big ones: 89 pages with duplicate titles (confusing Google), your /resources section isn't in the sitemap (invisible to crawlers), and load time hits 4.8 seconds on mobile. ProjectManagement.com fixed similar issues and saw 67% more organic traffic in 60 days without writing a single new post. I recorded a Loom showing your top 10 technical fixes in priority order - each with expected impact. Want to see it?"
+
+### **Campaign 3: "The Link Velocity Builder"**
+**Target**: Series B SaaS companies with good content but weak domain authority
+
+**Example email:**
+"Hi Jessica, [Company]'s product marketing content is solid but you're stuck at DR 42 while competitors average DR 65. Majestic shows you getting 2-3 backlinks monthly while [Competitor] gets 45+. They're doing digital PR - turning product updates into TechCrunch mentions. Your recent AI feature launch was perfect for this but only got 3 links. We helped Lattice go from DR 38 to 71 in 18 months using our journalist database and proven pitch templates. Want to see exactly which 15 publications would likely cover [Company]'s next feature launch?"
+
+---
+
+**Want VeoGrowth to execute these campaigns?**  
+We'll find B2B SaaS companies creating content but losing the SEO war and show them exactly how to outrank their competitors.
+
+[Book a Strategy Call →]
+
+*Note: These campaigns would target approximately 5,000-7,000 qualified B2B SaaS companies with content marketing efforts but poor organic visibility.*
+
 EXAMPLE 5 - Email Marketing Agency with Deep Personalization:
-... [rest of example 5] ...
+
+Based on FlowMasters' website analysis:
+
+## **Positioning Assessment: ✅ CLEAR**
+FlowMasters positions as the email marketing agency for ecommerce brands looking to scale revenue through automation and segmentation.
+
+---
+
+## **Your ICP appears to be:**
+- **Industry**: Ecommerce brands (fashion, beauty, lifestyle)
+- **Company size**: $2M-$20M annual revenue
+- **Key characteristics**:
+  - Email list of 10K+ but low engagement
+  - Using basic Klaviyo/Mailchimp features only
+  - Email revenue under 20% of total
+  - One welcome email then blast campaigns
+  - Know email could do more but lack expertise/time
+
+## **Key Personas to Target:**
+
+**1. Ecommerce Founder/Owner**
+- Pain points: Email feels like constant work for little return, leaving money on table, competitors doing it better
+
+**2. Email Marketing Manager**
+- Pain points: Stuck doing daily campaigns, no time for strategy, don't know advanced features
+
+**3. Head of Ecommerce**
+- Pain points: Email attribution unclear, revenue per recipient declining, list growth stalled
+
+---
+
+## **Campaign Ideas for FlowMasters:**
+
+### **Campaign 1: "The Revenue Recovery Sequence"**
+**Target**: DTC brands with 20K+ email list but under 15% email revenue
+
+**Example email:**
+"Hi Lauren, [Brand]'s welcome email with the founder story about your rescue dog sanctuary is perfect - that authentic voice really connects. But then subscribers get nothing for 2 weeks until your next sale. Brands with similar AOV to yours ($85) typically see 29% more revenue with a 5-email welcome series: expand the rescue story, showcase your eco-friendly process, customer transformation stories, behind-the-scenes of your Denver workshop, then soft discount. Chubbies built their $100M business perfecting this flow. Want me to map out the exact 5-email sequence we'd build for [Brand] with subject lines and preview text?"
+
+### **Campaign 2: "The Segmentation Gold Mine"**
+**Target**: Beauty/skincare brands sending batch-and-blast campaigns
+
+**Example email:**
+"Hi Ashley, [Brand] has 45K subscribers but your last campaign shows 2,200 Gmail clips. That means 43K people didn't even see it. Noticed you sell both anti-aging and acne products - but everyone gets the same emails? Your Shopify data is a goldmine: segment by skin concern, purchase history, AOV. Glossier sends 27 different versions of each campaign. Their acne-prone segment gets ingredient education, mature skin gets routine tips. Opens went from 18% to 34%. I can show you exactly how to segment your list based on your specific product lines - want to see the strategy?"
+
+### **Campaign 3: "The Win-Back Automation"**
+**Target**: Subscription box companies with high churn
+
+**Example email:**
+"Hi Chris, [Brand]'s subscription model is smart but Recharge shows 68% churn after month 3. Your cancellation email just says "sorry to see you go" - missing huge opportunity. FabFitFun wins back 23% of cancellations with a 4-email sequence: survey why they left, address that specific concern, show new products they missed, special "come back" offer. Your tea subscription could do: flavor preferences survey, limited edition blend announcement, customer story about finding their perfect tea, 30% off return offer. Want the exact automation flow we'd build with timing and triggers mapped out?"
+
+---
+
+**Want VeoGrowth to execute these campaigns?**  
+We'll identify ecommerce brands underutilizing email and show them exactly how to turn their list into a revenue engine.
+
+[Book a Strategy Call →]
+
+*Note: These campaigns would target approximately 6,000-8,000 qualified ecommerce brands with established email lists but poor email revenue contribution.*
+
 Remember: The quality bar is EXTREMELY high. Every campaign idea must feel like it required hours of research and deep industry knowledge. The prospect should think "how do they know exactly what I'm dealing with?"
+
 For agencies especially: ALWAYS include specific things found on their site, exact execution plans, and valuable free offers.`;
 
 
@@ -373,6 +688,11 @@ export async function POST(req) {
     }
 
     console.log('New lead:', { email, website, positioning, timestamp: new Date() });
+
+    if (!GEMINI_API_KEY || !geminiResearchModel) {
+        console.error("Critical: GEMINI_API_KEY not configured or model failed to initialize. Aborting research.");
+        return Response.json({ success: false, error: 'Research module not configured (API Key missing).' }, { status: 500 });
+    }
 
     // Run three research prompts in parallel with Gemini
     const [homepageDataString, caseStudyDataString, marketDataString] = await Promise.all([
@@ -396,16 +716,12 @@ export async function POST(req) {
 
     // Prepare the prompt for Claude
     let finalClaudePrompt = METAPROMPT
-      .replace('{research}', JSON.stringify(combinedResearch)) // Pass Gemini's research to Claude
+      .replace('{research}', JSON.stringify(combinedResearch)) 
       .replace('{website}', website)
       .replace('{positioning}', positioningAssessment);
     
-    // Ensure all example placeholders in METAPROMPT are filled, or handle if not.
-    // For this example, we assume METAPROMPT is complete with its own examples.
-
-    // Call Claude Opus for campaign generation
     const claudeResponse = await anthropic.messages.create({
-      model: 'claude-opus-4-20250514', // Confirmed Claude model
+      model: 'claude-opus-4-20250514',
       max_tokens: 4000,
       temperature: 0.7,
       messages: [{ role: 'user', content: finalClaudePrompt }]
@@ -415,7 +731,7 @@ export async function POST(req) {
 
     const companyNameFromUrl = website.replace(/https?:\/\//, '').replace('www.', '').split('/')[0];
 
-    // Format the response nicely with proper HTML (same as before)
+    // Format the response nicely with proper HTML
     const formattedAnalysis = `
       <div style="max-width: 800px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
         <h2 style="color: #1f2937; margin-bottom: 32px; font-size: 28px; font-weight: 700;">
@@ -432,23 +748,27 @@ export async function POST(req) {
             .replace(/\*\*Example email:\*\*/g, '<p style="margin: 12px 0 0 0;"><strong>Example email:</strong></p><div style="background: white; padding: 16px; border-left: 4px solid #4f46e5; margin: 8px 0; font-style: italic; color: #374151;">')
             .replace(/(<div style="background: white.*?">)([\s\S]*?)(?=(<\/div>|$|### \*\*Campaign|## \*\*|---|\*\*Want VeoGrowth))/g, (match, p1, p2) => {
                 let emailContent = p2;
-                // If a campaign block is ending, close the div for example email
                 if (!match.endsWith('</div>')) emailContent += '</div>'; 
                 return p1 + emailContent;
             })
-            .replace(/### ⚠️ \*\*Note on Social Proof\*\*:/g, '</div><div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 16px; border-radius: 8px; margin: 32px 0;"><h4 style="color: #92400e; margin: 0 0 8px 0;">⚠️ Note on Social Proof:</h4>')
+            .replace(/### ⚠️ \*\*Note on Social Proof\*\*:/g, (match) => {
+                let prefix = '</div>'; // Close previous email example div
+                const precedingText = analysis.substring(0, analysis.indexOf(match));
+                if (precedingText.match(/<div style="background: #f3f4f6.*?$/s) && !precedingText.endsWith('</div>')) {
+                   prefix += '</div>'; // Close campaign block div if open
+                }
+                return prefix + '<div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 16px; border-radius: 8px; margin: 32px 0;"><h4 style="color: #92400e; margin: 0 0 8px 0;">⚠️ Note on Social Proof:</h4>';
+            })
             .replace(/\*\*Want VeoGrowth to execute these campaigns\?\*\*/g, (match) => {
-                // Ensure previous campaign email block is closed if it was open
                 let prefix = '';
-                if (!analysis.substring(0, analysis.indexOf(match)).endsWith('</div></div>')) { // Heuristic
-                   prefix = '</div>'; // Close email content div
+                const precedingText = analysis.substring(0, analysis.indexOf(match));
+                if (precedingText.match(/<div style="background: #fef3c7.*?$/s) && !precedingText.endsWith('</div>')) {
+                   prefix = '</div>'; // Close social proof div
+                } else if (precedingText.match(/<div style="background: white.*?$/s) && !precedingText.endsWith('</div></div>')) {
+                   prefix = '</div></div>'; // Close email example and campaign block
+                } else if (precedingText.match(/<div style="background: #f3f4f6.*?$/s) && !precedingText.endsWith('</div>')) {
+                   prefix = '</div>'; // Close campaign block
                 }
-                 // If previous element was a campaign block, it would have its own closing div.
-                if (analysis.substring(0, analysis.indexOf(match)).match(/<div style="background: #f3f4f6.*?$/s) && !analysis.substring(0, analysis.indexOf(match)).endsWith('</div>')) {
-                    prefix += '</div>'; // Close campaign block div
-                }
-
-
                 return prefix + '<h3 style="color: #1f2937; margin: 32px 0 16px 0; font-size: 22px; font-weight: 700; text-align: center;">Want VeoGrowth to execute these campaigns?</h3>';
             })
             .replace(/\[Book a Strategy Call →\]/g, '')
