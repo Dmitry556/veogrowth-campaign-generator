@@ -11,7 +11,7 @@ const anthropicClient = new Anthropic({
 // Initialize Resend Client
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Helper function to safely parse JSON from AI outputs
+// Helper function to safely parse JSON from AI outputs (Opus will output JSON)
 function safeJsonParse(jsonString, stepName = "AIOutput") {
   if (typeof jsonString !== 'string' || !jsonString.trim()) {
     console.warn(`safeJsonParse for ${stepName}: Input is not a non-empty string. Input:`, jsonString);
@@ -33,58 +33,54 @@ function safeJsonParse(jsonString, stepName = "AIOutput") {
   }
 }
 
-// --- RESEARCH PROMPTS for Claude Haiku ---
+// --- RESEARCH PROMPTS for Claude Haiku (to output text summaries) ---
 const HAIKU_RESEARCH_PROMPTS = {
   homepage: {
     promptName: "HaikuHomepageAnalysis",
     content: `You are an AI research assistant. Your task is to analyze the homepage of {website} for the company {company}.
-Use your web_search tool if needed to understand the company and its offerings from their homepage.
-Extract the following information:
-1.  "company_name": The official company name found.
-2.  "product_description": A concise 1-2 sentence description of their main product/service.
-3.  "key_features": A list of 3-5 key features mentioned.
-4.  "target_audience_keywords": A list of 3-5 keywords describing their target audience or industries.
-Return this information *ONLY* as a single, minified JSON object with these exact keys. No other text.
-Example: {"company_name": "Example Inc.", "product_description": "Provides AI solutions for X.", "key_features": ["Feature A", "Feature B"], "target_audience_keywords": ["SaaS", "B2B", "Enterprise"]} `
+Use your web_search tool to understand the company and its offerings from their homepage.
+Provide a concise text summary covering:
+- The company's official name.
+- Their main product/service.
+- 3-5 key features.
+- 3-5 keywords describing their target audience or industries.
+Present this as a readable paragraph or bullet points. Do not output JSON. Ensure your summary is well-structured and easy to understand.`
   },
   caseStudies: {
     promptName: "HaikuCaseStudySearch",
     content: `You are an AI research assistant. Find **up to 2** concise customer case studies or success story summaries for {company} ({website}).
 Use your web_search tool. Focus on finding mentions of customer names and quantifiable results or specific benefits.
-For each case study (max 2):
-1.  "customer_name": The customer's company name.
-2.  "key_result_or_benefit": A brief (1 sentence) summary of the main result or benefit achieved by the customer using {company}'s product/service.
-Return this information *ONLY* as a single, minified JSON object.
-The main key should be "found_case_studies", an array of these objects. Include a "search_summary_note" string.
-Example: {"found_case_studies": [{"customer_name": "Acme Corp", "key_result_or_benefit": "Increased efficiency by 30%."}], "search_summary_note": "Found 1 relevant case study snippet."}
-If no clear case studies are found, return an empty array for "found_case_studies" and note it in "search_summary_note".`
+For each case study (max 2), provide a brief text summary including:
+- Customer's company name.
+- A short description of the key result or benefit.
+If no clear case studies are found, clearly state that in your summary.
+Present this as readable paragraphs or bullet points. Do not output JSON. Ensure your summary is well-structured.`
   },
   marketContext: {
     promptName: "HaikuMarketContextSearch",
-    content: `You are an AI research assistant. Provide a brief market context for {company} ({website}).
+    content: `You are an AI research assistant. Provide a brief market context summary for {company} ({website}).
 Use your web_search tool to identify:
-1.  "identified_competitors": A list of 1-2 main competitors.
-2.  "core_differentiators": A list of 1-2 key differentiators for {company} compared to alternatives.
-Return this information *ONLY* as a single, minified JSON object with these exact keys. No other text.
-Example: {"identified_competitors": ["CompetitorX", "CompetitorY"], "core_differentiators": ["Unique Feature Z", "Better Pricing"]}`
+- 1-2 main competitors.
+- 1-2 key differentiators for {company}.
+Present this as a readable paragraph or bullet points. Do not output JSON. Ensure your summary is well-structured.`
   }
 };
 
-// Function to perform research with Claude Haiku + Web Search
+// Function to perform research with Claude Haiku + Web Search (returns text summary)
 async function performClaudeHaikuResearch(website, researchObjective) {
   const companyNameFromUrl = website.replace(/https?:\/\//, "").replace("www.", "").split("/")[0];
   const prompt = researchObjective.content
     .replace("{website}", website)
-    .replace(/{company}/g, companyNameFromUrl); 
+    .replace(/{company}/g, companyNameFromUrl);
 
   console.log(`Starting Haiku research: ${researchObjective.promptName} for ${website}`);
   console.time(researchObjective.promptName);
-  let finalJsonString = ""; 
+  let researchTextSummary = ""; 
 
   try {
     const response = await anthropicClient.messages.create({
       model: "claude-3-5-haiku-latest", 
-      max_tokens: 2000, 
+      max_tokens: 1500, 
       messages: [{ role: "user", content: prompt }],
       tools: [{
         "type": "web_search_20250305",
@@ -94,44 +90,46 @@ async function performClaudeHaikuResearch(website, researchObjective) {
     });
     
     if (response && response.content && response.content.length > 0) {
-      for (let i = response.content.length - 1; i >= 0; i--) {
-        if (response.content[i].type === 'text' && typeof response.content[i].text === 'string') {
-          finalJsonString = response.content[i].text;
-          break; 
+      // Concatenate all text parts, as Haiku might return multiple text blocks after tool use
+      response.content.forEach(block => {
+        if (block.type === 'text' && typeof block.text === 'string') {
+          researchTextSummary += block.text + "\n"; 
         }
-      }
-      if (finalJsonString) {
-        console.log(`Haiku research ${researchObjective.promptName} - final text block (first 100): ${finalJsonString.substring(0, 100)}`);
+      });
+      researchTextSummary = researchTextSummary.trim();
+
+      if (researchTextSummary) {
+        console.log(`Haiku research ${researchObjective.promptName} - text summary (first 100): ${researchTextSummary.substring(0, 100)}`);
       } else {
-        console.warn(`Haiku research ${researchObjective.promptName} for ${website} did not produce a final text block after tool use. Content:`, JSON.stringify(response.content.slice(-2), null, 2)); 
-        finalJsonString = JSON.stringify({ error: `Haiku did not produce a final text JSON for ${researchObjective.promptName} after tool interactions.` });
+        console.warn(`Haiku research ${researchObjective.promptName} for ${website} did not produce any text output after tool use. Content:`, JSON.stringify(response.content.slice(-2), null, 2)); 
+        researchTextSummary = `Error: Haiku did not produce text output for ${researchObjective.promptName}.`;
       }
     } else {
       console.warn(`Haiku research ${researchObjective.promptName} for ${website} returned no content array or empty content. Response:`, JSON.stringify(response, null, 2));
-      finalJsonString = JSON.stringify({ error: `Haiku returned no content for ${researchObjective.promptName}` });
+      researchTextSummary = `Error: Haiku returned no content for ${researchObjective.promptName}.`;
     }
     
     console.timeEnd(researchObjective.promptName);
-    return safeJsonParse(finalJsonString, researchObjective.promptName);
+    return researchTextSummary; // Return the raw text summary
 
   } catch (error) {
     console.timeEnd(researchObjective.promptName); 
     console.error(`Error during Haiku research (${researchObjective.promptName}) for ${website}:`, error);
-    const errorDetails = error.message ? error.message : "Unknown error during Haiku research";
-    return safeJsonParse(JSON.stringify({ error: `Failed Haiku research for ${researchObjective.promptName}`, details: errorDetails }), researchObjective.promptName);
+    return `Error: Failed Haiku research for ${researchObjective.promptName}. Details: ${error.message}`;
   }
 }
 
-// --- CLAUDE OPUS METAPROMPT for Campaign Generation (using research from Haiku) ---
-const CLAUDE_OPUS_GENERATION_METAPROMPT = `You are VeoGrowth's AI strategist analyzing a company's website to generate hyper-specific B2B cold email campaign ideas. You will produce EXACTLY the same format and quality as shown in the examples, with zero deviation.
+// --- CLAUDE OPUS METAPROMPT for Campaign Generation (using text research from Haiku) ---
+const CLAUDE_OPUS_GENERATION_METAPROMPT = `You are VeoGrowth's AI strategist analyzing a company's website to generate hyper-specific B2B cold email campaign ideas. You will produce EXACTLY the same format and quality as shown in the examples, with zero deviation in the final JSON output structure.
 
 CRITICAL CONTEXT: VeoGrowth is an AI-powered lead generation agency that creates hyper-personalized cold email campaigns. We help companies book qualified meetings by understanding their prospects deeply and crafting messages that resonate.
 
-INPUTS PROVIDED TO YOU (available in the {research_data_json} placeholder):
-- Research Data (research_data_json): This is a JSON object containing three main keys: "homepageInfo", "caseStudyInfo", and "marketInfo". Each of these keys holds structured information gathered by a research AI (Claude Haiku).
-  - research_data_json.homepageInfo: Contains "company_name", "product_description", "key_features", "target_audience_keywords".
-  - research_data_json.caseStudyInfo: Contains "found_case_studies" (an array of objects with "customer_name", "key_result_or_benefit") and "search_summary_note".
-  - research_data_json.marketInfo: Contains "identified_competitors" and "core_differentiators".
+INPUTS PROVIDED TO YOU:
+- Raw Research Summaries ({research_summaries_text}): This is a block of text containing up to three sections, each starting with a clear header:
+  1.  "HOMEPAGE ANALYSIS SUMMARY:" followed by a text summary about the company's homepage (name, product, features, target audience).
+  2.  "CASE STUDY SEARCH SUMMARY:" followed by text summarizing any found case studies (customer names, key benefits) or stating if none were found.
+  3.  "MARKET CONTEXT SUMMARY:" followed by text about competitors and differentiators.
+  You need to carefully read, parse, and understand these text summaries to extract the necessary information for your final JSON output.
 - Website URL: {website}
 - User's Positioning Assessment: {positioning_input}
 
@@ -140,12 +138,12 @@ NEVER FORGET RULES:
 2. Email examples must be concise, ideally under 70 words.
 3. Always use periods between sentences. Never use dashes as sentence separators.
 4. Never start observations with "noticed" or "saw". Jump straight to the fact.
-5. Make every observable fact specific and publicly findable (or clearly derivable from the Research Data).
-6. If (!research_data_json.caseStudyInfo || !research_data_json.caseStudyInfo.found_case_studies || research_data_json.caseStudyInfo.found_case_studies.length === 0 || (research_data_json.caseStudyInfo.search_summary_note && research_data_json.caseStudyInfo.search_summary_note.toLowerCase().includes("no"))), ALWAYS include the "socialProofNote" in your JSON output.
+5. Make every observable fact specific and publicly findable (or clearly derivable from the provided Raw Research Summaries).
+6. If the "CASE STUDY SEARCH SUMMARY" section in {research_summaries_text} indicates no clear case studies were found or if it's missing, ALWAYS include the "socialProofNote" in your JSON output.
 7. Target segments must be substantial (1,000+ prospects minimum).
 8. When appropriate for personalization, use natural vivid imagery relevant to the prospect's pain.
 9. For agencies: ALWAYS include specific execution details and valuable offers in the "veoGrowthPitch".
-10. Show, don't tell: Demonstrate understanding through specifics drawn from research_data_json.
+10. Show, don't tell: Demonstrate understanding through specifics synthesized from the Raw Research Summaries.
 
 VIVID IMAGERY GUIDELINES:
 - Use ONLY when it naturally fits and is hyper-relevant to the problem.
@@ -153,110 +151,84 @@ VIVID IMAGERY GUIDELINES:
 - Don't force it. Clarity is paramount.
 
 <output_instructions>
-Your *ENTIRE RESPONSE* MUST be a single, minified JSON object. Do NOT include any text, explanations, or Markdown formatting before or after the JSON object.
+Your *ENTIRE RESPONSE* MUST be a single, minified JSON object. Do NOT include any text, explanations, or Markdown formatting (like \`\`\`json) before or after the JSON object.
 The JSON object must have the following top-level keys:
-"positioningAssessmentOutput": A string containing your 1-2 sentence positioning assessment based on research_data_json.homepageInfo and {positioning_input}.
-"idealCustomerProfile": An object with keys: "industry" (string, use research_data_json.homepageInfo.target_audience_keywords), "companySize" (string, e.g., "SMBs, Mid-Market, Enterprise" - infer if not explicit), "keyCharacteristics" (array of 3-5 strings, using all research data).
-"keyPersonas": An array of 2-3 objects, each with "title" (string) and "painPoints" (string, comma-separated list of 3-4 pain points).
+"positioningAssessmentOutput": A string containing your 1-2 sentence positioning assessment, informed by the "HOMEPAGE ANALYSIS SUMMARY" and the user's {positioning_input}.
+"idealCustomerProfile": An object with keys: "industry" (string, derived from "HOMEPAGE ANALYSIS SUMMARY"), "companySize" (string, e.g., "SMBs, Mid-Market, Enterprise" - infer if not explicit), "keyCharacteristics" (array of 3-5 strings, synthesized from all research summaries).
+"keyPersonas": An array of 2-3 objects, each with "title" (string) and "painPoints" (string, comma-separated list of 3-4 pain points relevant to the company's offerings).
 "campaignIdeas": An array of 3 objects, each with "name" (string, descriptive campaign name), "target" (string), and "emailBody" (string, the example email).
 "socialProofNote": A string for the social proof note if applicable (see rule 6), otherwise an empty string or null.
 "veoGrowthPitch": A string for the VeoGrowth pitch.
 "prospectTargetingNote": A string for the note about prospect targeting numbers.
 
-Refer to the research_data_json object extensively.
-Example of the overall JSON structure (content will vary):
+To populate this JSON, you must carefully read and interpret the information within the "HOMEPAGE ANALYSIS SUMMARY", "CASE STUDY SEARCH SUMMARY", and "MARKET CONTEXT SUMMARY" sections of the {research_summaries_text} input.
+Example of the overall JSON structure (content will vary based on your interpretation of the research summaries):
 {
-  "positioningAssessmentOutput": "✅ CLEAR: {website} clearly communicates its value as [research_data_json.homepageInfo.product_description] for [research_data_json.homepageInfo.target_audience_keywords.join(', ')].",
+  "positioningAssessmentOutput": "✅ CLEAR: {website} clearly communicates its value as [main product from Homepage Summary] for [target audience keywords from Homepage Summary].",
   "idealCustomerProfile": {
-    "industry": "[research_data_json.homepageInfo.target_audience_keywords.join(', ') or specific industry]",
-    "companySize": "Small to Large Businesses",
+    "industry": "[Main industry from Homepage Summary's target_audience_keywords]",
+    "companySize": "Small to Large Businesses (inferred)",
     "keyCharacteristics": [
-      "Seeking solutions for [pain point related to research_data_json.homepageInfo.product_description]",
-      "Utilizes technologies where [research_data_json.homepageInfo.key_features[0]] would be beneficial",
-      "Operates in a market with competitors like [research_data_json.marketInfo.identified_competitors[0] if available]",
-      "Values [research_data_json.marketInfo.core_differentiators[0] if available]",
-      "Aims to achieve outcomes similar to those in research_data_json.caseStudyInfo.found_case_studies (if any)"
+      "Seeking solutions for [problem related to product in Homepage Summary]",
+      "Could benefit from [key feature from Homepage Summary]",
+      "Likely aware of competitors such as [competitor from Market Context Summary, if any]",
+      "Values benefits like [differentiator from Market Context Summary, if any]",
+      "Aims for outcomes similar to [customer benefit from Case Study Summary, if any, otherwise a general product benefit]"
     ]
   },
   "keyPersonas": [
-    { "title": "[Common title for target_audience_keywords]", "painPoints": "Pain A, Pain B, Pain C" },
-    { "title": "[Another title]", "painPoints": "Challenge X, Challenge Y, Challenge Z" }
+    { "title": "[Common job title for target audience in Homepage Summary]", "painPoints": "Pain A, Pain B, Pain C (relevant to product)" },
+    { "title": "[Another relevant job title]", "painPoints": "Challenge X, Challenge Y, Challenge Z (relevant to product)" }
   ],
   "campaignIdeas": [
     {
       "name": "[Descriptive Campaign Name 1]",
-      "target": "[Target persona 1] at [company type using target_audience_keywords]",
-      "emailBody": "Hi [Name], [Observable fact about prospect's company related to research_data_json.homepageInfo.product_description]. [Vivid pain point]. {company} helped [IF research_data_json.caseStudyInfo.found_case_studies && research_data_json.caseStudyInfo.found_case_studies.length > 0, use research_data_json.caseStudyInfo.found_case_studies[0].customer_name, ELSE 'companies like yours'] achieve [IF research_data_json.caseStudyInfo.found_case_studies && research_data_json.caseStudyInfo.found_case_studies.length > 0, use research_data_json.caseStudyInfo.found_case_studies[0].key_result_or_benefit, ELSE a benefit related to research_data_json.homepageInfo.key_features]. [CTA?]"
-    },
-    {
-      "name": "[Descriptive Campaign Name 2]",
-      "target": "[Target persona 2] at [different company type]",
-      "emailBody": "Hi [Name], [Different observable fact]. [Different pain point]. Using {company}'s [research_data_json.homepageInfo.key_features[1] if available, else a general feature], companies like [IF research_data_json.caseStudyInfo.found_case_studies && research_data_json.caseStudyInfo.found_case_studies.length > 1, use research_data_json.caseStudyInfo.found_case_studies[1].customer_name, ELSE IF research_data_json.caseStudyInfo.found_case_studies && research_data_json.caseStudyInfo.found_case_studies.length > 0, 'another leading business', ELSE 'other businesses'] saw [IF research_data_json.caseStudyInfo.found_case_studies && research_data_json.caseStudyInfo.found_case_studies.length > 1, research_data_json.caseStudyInfo.found_case_studies[1].key_result_or_benefit, ELSE IF research_data_json.caseStudyInfo.found_case_studies && research_data_json.caseStudyInfo.found_case_studies.length > 0, 'significant improvements', ELSE 'positive results']. [Different conversational CTA?]"
-    },
-    {
-      "name": "[Descriptive Campaign Name 3]",
-      "target": "[Target persona 3] at [third company type]",
-      "emailBody": "Hi [Name], [Third observable fact, perhaps related to research_data_json.marketInfo.identified_competitors[0] if available]. [Pain point]. {company} addresses this by [research_data_json.marketInfo.core_differentiators[0] if available, else research_data_json.homepageInfo.product_description]. [General benefit or a reference to research_data_json.homepageInfo.value_props[0] if available]. [Third CTA?]"
+      "target": "[Target persona 1] at [company type based on Homepage Summary]",
+      "emailBody": "Hi [Name], [Observable fact related to company's product from Homepage Summary]. [Vivid pain point]. {company} helped [IF Case Study Summary mentions a customer, use that customer_name, ELSE 'companies like yours'] achieve [IF Case Study Summary mentions a key_result_or_benefit, use that, ELSE a general benefit of the product from Homepage Summary]. [CTA?]"
     }
+    // ... (2 more campaign ideas, varying how they use the research summaries)
   ],
-  "socialProofNote": "[Generate if rule 6 applies, using research_data_json.caseStudyInfo.search_summary_note, else empty string]",
-  "veoGrowthPitch": "Want VeoGrowth to execute these campaigns? We'll leverage insights about your [research_data_json.homepageInfo.product_description] to connect with ideal clients.",
-  "prospectTargetingNote": "Note: These campaigns would target approximately [X,000-Y,000] qualified prospects in the [research_data_json.homepageInfo.target_audience_keywords.join('/')] sectors."
+  "socialProofNote": "[Generate if rule 6 applies, informed by the Case Study Summary, else empty string]",
+  "veoGrowthPitch": "Want VeoGrowth to execute these campaigns? We'll leverage insights about their [product from Homepage Summary] to connect with ideal clients.",
+  "prospectTargetingNote": "Note: These campaigns would target approximately [X,000-Y,000] qualified prospects in [target industries from Homepage Summary]."
 }
-Ensure all string values are properly escaped.
-The examples below (EXAMPLE 1, EXAMPLE 2, etc.) are for style and content guidance for each section of *your* JSON output. Do not just copy them; adapt their content quality and specificity using the provided {research_data_json}.
+Ensure all string values in your JSON output are properly escaped.
+The examples below (EXAMPLE 1, EXAMPLE 2, etc.) are for style and content guidance for each section of *your* JSON output. Do not just copy them; adapt their content quality and specificity by interpreting the {research_summaries_text} provided.
 </output_instructions>
 
 ---
 EXAMPLE 1 - SaaS with Clear Positioning (IXON):
-This section now guides the *content* of your JSON output if the {research_data_json} were like IXON.
-If {research_data_json} for IXON was:
-research_data_json.homepageInfo = {"company_name": "IXON", "product_description": "IIoT platform for industrial remote access...", "key_features": ["Remote Access", "Data Logging"], "target_audience_keywords": ["Machine Builders", "OEMs"]}
-research_data_json.caseStudyInfo = {"found_case_studies": [{"customer_name": "Repak", "key_result_or_benefit": "Cut on-site visits by 70%."}], "search_summary_note": "Found 1 strong case study."}
-research_data_json.marketInfo = {"identified_competitors": ["HMS eWON"], "core_differentiators": ["All-in-one platform", "Ease of use"]}
+If the {research_summaries_text} for {website} contained these summaries (condensed for brevity):
+HOMEPAGE ANALYSIS SUMMARY: IXON, IIoT platform for machine builders. Features: Remote Access, Data Logging. Target: Machine Builders, OEMs.
+CASE STUDY SEARCH SUMMARY: Customer: Repak, Benefit: Cut on-site visits by 70%. Found 1 strong case study.
+MARKET CONTEXT SUMMARY: Competitors: HMS eWON. Differentiators: All-in-one platform.
 
 Your JSON output's "positioningAssessmentOutput" string would be: "✅ CLEAR. IXON clearly positions its IIoT platform for Machine Builders and OEMs, emphasizing remote access and data logging."
 The "idealCustomerProfile" object would be:
 {
-  "industry": "Machine Builders, OEMs, Industrial Automation",
-  "companySize": "50-500 employees (mid-market manufacturers)",
-  "keyCharacteristics": ["Build complex industrial machines requiring remote support", "Need secure remote access", "Value ease of use in IIoT", "Competes with or considers HMS eWON"]
+  "industry": "Machine Builders, OEMs",
+  "companySize": "50-500 employees (inferred)",
+  "keyCharacteristics": ["Build complex industrial machines", "Need remote access & data logging", "Value all-in-one IIoT solutions"]
 }
-The "keyPersonas" array would contain objects like:
-[
-  { "title": "VP of Service / Service Manager", "painPoints": "High travel costs, slow response times, technician productivity, customer satisfaction" },
-  { "title": "CTO / Head of Engineering", "painPoints": "Security compliance, data collection from machines, building competitive advantages" }
-]
-The "campaignIdeas" array would contain 3 campaign objects, for example, the first one:
+// ... (rest of the example structured as per the JSON output schema, using the summarized text research) ...
+The "campaignIdeas" array's first item:
 {
   "name": "Travel Cost Crusher",
   "target": "VP of Service at Machine Builders with 10+ field technicians",
   "emailBody": "Hi Mark, many Machine Builders struggle with high travel costs for service calls. IXON's IIoT platform helped Repak cut on-site visits by 70% through secure remote access. Worth exploring how you can achieve similar savings?"
 }
-// ... (and two other campaign objects for IXON) ...
 The "socialProofNote" would be an empty string.
-The "veoGrowthPitch": "Want VeoGrowth to execute these campaigns? We'll build targeted lists of machine builders struggling with service costs and craft messages that resonate with their specific challenges."
-The "prospectTargetingNote": "Note: These campaigns would target approximately 3,000-5,000 qualified Machine Builders and OEMs in North America and Europe."
 
 ---
 EXAMPLE 2 - SaaS with Unclear Positioning (Tourmo):
-// ... (Follow the JSON structure, populating with hypothetical Tourmo research data from Haiku and campaign ideas from Opus) ...
-"socialProofNote": "Our AI research found limited specific case studies for Tourmo. The research notes: '[Content from research_data_json.caseStudyInfo.search_summary_note for Tourmo]'. The examples above use hypothetical scenarios. When we work together, you'll provide real customer success stories."
+If {research_summaries_text} for Tourmo indicated unclear positioning and no strong case studies:
+// ... (populate JSON based on this interpretation) ...
+"socialProofNote": "Our AI research (via Claude Haiku) found limited specific case studies for Tourmo. The Haiku research notes: '[Content of search_summary_note from Haiku for Tourmo]'. The examples use hypothetical scenarios."
 
 ---
-EXAMPLE 3 - Agency with Hyper-Personalization (ConversionLab):
-// ...(Follow the JSON structure for ConversionLab)...
+// ... (Include your other original examples: EXAMPLE 3, 4, 5, adapting them slightly to show how Opus would derive its JSON content from hypothetical text summaries for ConversionLab, RankRise, FlowMasters) ...
 
----
-EXAMPLE 4 - SEO Agency with Specific Execution (RankRise):
-// ...(Follow the JSON structure for RankRise)...
-
----
-EXAMPLE 5 - Email Marketing Agency with Deep Personalization (FlowMasters):
-// ...(Follow the JSON structure for FlowMasters)...
-
-Remember: The quality bar is EXTREMELY high. Every campaign idea must feel like it required hours of research and deep industry knowledge, drawing from the {research_data_json}.
-Your entire output MUST be only the single JSON object. Adhere strictly to the defined JSON output structure.
+Remember: The quality bar is EXTREMELY high. Your entire output MUST be only the single JSON object.
 `;
 
 // --- Function to send email with analysis (uses final Claude Opus JSON) ---
@@ -264,13 +236,12 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
   try {
     const escapeHtml = (unsafe) => {
         if (typeof unsafe !== 'string') return '';
-        let safe = unsafe;
-        safe = safe.replace(/&/g, "\u0026amp;"); // Ampersand
-        safe = safe.replace(/</g, "\u0026lt;");  // Less than
-        safe = safe.replace(/>/g, "\u0026gt;");  // Greater than
-        safe = safe.replace(/"/g, "\u0026quot;"); // Double quote
-        safe = safe.replace(/'/g, "\u0026#039;"); // Single quote (apostrophe)
-        return safe;
+        return unsafe
+             .replace(/&/g, "&")
+             .replace(/</g, "<")
+             .replace(/>/g, ">")
+             .replace(/"/g, """)
+             .replace(/'/g, "'");
     };
     
     const emailHtmlForUser = `
@@ -412,7 +383,7 @@ export async function POST(req) {
     // Step 1: Perform research with Claude Haiku (3 tasks in parallel)
     console.log(`Starting PARALLEL Haiku research for ${website}...`);
     console.time("HaikuResearchTotal");
-    const [homepageInfo, caseStudyInfo, marketInfo] = await Promise.all([
+    const [homepageSummary, caseStudySummary, marketSummary] = await Promise.all([
       performClaudeHaikuResearch(website, HAIKU_RESEARCH_PROMPTS.homepage),
       performClaudeHaikuResearch(website, HAIKU_RESEARCH_PROMPTS.caseStudies),
       performClaudeHaikuResearch(website, HAIKU_RESEARCH_PROMPTS.marketContext)
@@ -420,16 +391,22 @@ export async function POST(req) {
     console.timeEnd("HaikuResearchTotal");
     console.log(`All PARALLEL Haiku research completed for ${website}.`);
 
-    const researchDataForOpus = {
-      homepageInfo: homepageInfo.error ? { error: homepageInfo.error, details: homepageInfo.details, original_snippet: homepageInfo.original_snippet } : homepageInfo,
-      caseStudyInfo: caseStudyInfo.error ? { error: caseStudyInfo.error, details: caseStudyInfo.details, original_snippet: caseStudyInfo.original_snippet } : caseStudyInfo,
-      marketInfo: marketInfo.error ? { error: marketInfo.error, details: marketInfo.details, original_snippet: marketInfo.original_snippet } : marketInfo,
-    };
-    console.log('HAIKU RESEARCH OUTPUT (to be passed to Opus):', JSON.stringify(researchDataForOpus, null, 2));
+    // Construct a single text block from Haiku's research summaries for Opus
+    const researchSummariesTextForOpus = `
+HOMEPAGE ANALYSIS SUMMARY:
+${homepageSummary.error ? `Error: ${homepageSummary.details}` : homepageSummary}
 
-    // Step 2: Generate Campaigns with Claude Opus, using Haiku's research
+CASE STUDY SEARCH SUMMARY:
+${caseStudySummary.error ? `Error: ${caseStudySummary.details}` : caseStudySummary}
+
+MARKET CONTEXT SUMMARY:
+${marketSummary.error ? `Error: ${marketSummary.details}` : marketSummary}
+    `;
+    console.log('TEXT SUMMARIES FROM HAIKU (to be passed to Opus):', researchSummariesTextForOpus);
+
+    // Step 2: Generate Campaigns with Claude Opus, using Haiku's text research
     const finalPromptForOpus = CLAUDE_OPUS_GENERATION_METAPROMPT
-      .replace('{research_data_json}', JSON.stringify(researchDataForOpus))
+      .replace('{research_summaries_text}', researchSummariesTextForOpus) // Inject Haiku's text research
       .replace('{website}', website)
       .replace(/{company}/g, companyNameFromUrl) 
       .replace('{positioning_input}', positioning);
@@ -470,9 +447,17 @@ export async function POST(req) {
 
     if (finalAnalysisJson.error) {
         console.error("Claude Opus did not return valid JSON. Raw output snippet:", opusOutputText.substring(0, 1000));
-        // If parsing fails, we still want to send an email, but with an error message or the raw text for debugging
         const errorEmailHtml = `<h1>Analysis Generation Failed</h1><p>Could not parse the AI's response. Raw output snippet:</p><pre>${escapeHtml(opusOutputText.substring(0,2000))}</pre>`;
-        await sendEmailReport(email, companyNameFromUrl, { error: "AI_OUTPUT_PARSE_ERROR", raw_snippet: opusOutputText.substring(0,2000), positioningAssessmentOutput: errorEmailHtml }); // Send a modified payload or just error
+        // Send a simplified error object if claude's output is not the expected campaign JSON
+        await sendEmailReport(email, companyNameFromUrl, { 
+            positioningAssessmentOutput: errorEmailHtml, 
+            idealCustomerProfile: {}, 
+            keyPersonas: [], 
+            campaignIdeas: [],
+            socialProofNote: "Error: Could not generate analysis.",
+            veoGrowthPitch: "",
+            prospectTargetingNote: ""
+        });
         return Response.json({ success: false, error: "Failed to parse final analysis from AI.", debug_opus_output_snippet: opusOutputText.substring(0, 1000) }, { status: 500 });
     }
     
@@ -503,5 +488,5 @@ export async function POST(req) {
 }
 
 export async function GET() {
-  return Response.json({ message: 'VeoGrowth Campaign Generator API - Haiku Research + Opus Campaigns!' });
+  return Response.json({ message: 'VeoGrowth Campaign Generator API - Haiku Research (Text) + Opus Campaigns (JSON)!' });
 }
