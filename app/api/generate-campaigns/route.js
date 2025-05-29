@@ -360,7 +360,7 @@ export async function POST(req) {
       tools: [{ // Enable web search tool for Claude
         "type": "web_search_20250305", // Using the identifier from your research
         "name": "web_search",
-        "max_uses": 10 // Allow more searches if needed for comprehensive research
+        "max_uses": 5 // Allow more searches if needed for comprehensive research
       }],
       // Enable extended thinking for Claude
       // thinking: { // According to your research, this is how it's enabled.
@@ -374,7 +374,7 @@ export async function POST(req) {
     {
       thinking: { // Correct placement for thinking based on some SDK structures
         "type": "enabled",
-        "budget_tokens": 15000 // Increased budget slightly
+        "budget_tokens": 5000 // Increased budget slightly
       }
     }
     );
