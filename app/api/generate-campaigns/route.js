@@ -51,17 +51,15 @@ async function performResearchWithGemini(geminiModel, website, researchPromptObj
   const promptIdentifier = researchPromptObject.promptName || 'unknown_research';
   const promptText = researchPromptObject.content;
 
-  if (!geminiModel) { // Check if the specific model instance is available
+  if (!geminiModel) {
     console.error(`Gemini model for "${promptIdentifier}" not initialized (API key missing or model init failed).`);
     return JSON.stringify({ error: `Gemini model for ${promptIdentifier} not configured` });
   }
 
   try {
-    // Get the model name from the model object for logging if possible, otherwise use a placeholder
     const modelNameForLog = geminiModel.model || "unknown_gemini_model";
     console.log(`Starting Gemini research for "${promptIdentifier}" on ${website} using model: ${modelNameForLog}`);
     console.time(`${promptIdentifier}_${website}`);
-
 
     const fullPrompt = promptText
       .replace('{website}', website)
@@ -71,7 +69,7 @@ async function performResearchWithGemini(geminiModel, website, researchPromptObj
     const result = await geminiModel.generateContent(fullPrompt);
     const response = result.response;
 
-     if (!response || !response.candidates || response.candidates.length === 0 || !response.candidates[0].content || !response.candidates[0].content.parts || response.candidates[0].content.parts.length === 0) {
+    if (!response || !response.candidates || response.candidates.length === 0 || !response.candidates[0].content || !response.candidates[0].content.parts || response.candidates[0].content.parts.length === 0) {
       const blockReason = response?.promptFeedback?.blockReason || 'No content returned';
       const safetyRatings = response?.promptFeedback?.safetyRatings || 'N/A';
       console.warn(`Gemini research for "${promptIdentifier}" on ${website} returned no content or was blocked. Reason: ${blockReason}. Safety Ratings: ${JSON.stringify(safetyRatings)}`);
@@ -79,9 +77,28 @@ async function performResearchWithGemini(geminiModel, website, researchPromptObj
       return JSON.stringify({ error: `Gemini returned no content or was blocked for ${promptIdentifier}. Reason: ${blockReason}` });
     }
     
-    const researchOutputText = response.text();
+    let researchOutputText = response.text(); // Or response.candidates[0].content.parts[0].text
+    
+    // ---- NEW: Clean up Markdown code block if present ----
+    const markdownJsonRegex = /```json\s*([\s\S]*?)\s*```/; // Regex to find ```json ... ```
+    const match = researchOutputText.match(markdownJsonRegex);
+    if (match && match[1]) {
+      researchOutputText = match[1].trim(); // Extract only the JSON part
+      console.log(`Cleaned Markdown JSON for "${promptIdentifier}"`);
+    } else {
+      // Also try to clean if it's just ``` ... ``` without 'json'
+      const markdownGenericRegex = /```\s*([\s\S]*?)\s*```/;
+      const genericMatch = researchOutputText.match(markdownGenericRegex);
+      if (genericMatch && genericMatch[1]) {
+          researchOutputText = genericMatch[1].trim();
+          console.log(`Cleaned generic Markdown for "${promptIdentifier}"`);
+      }
+    }
+    // ---- END NEW ----
+    
     console.timeEnd(`${promptIdentifier}_${website}`);
-    console.log(`Gemini research for "${promptIdentifier}" on ${website} (model: ${modelNameForLog}) completed in ${console.timeLog ? '' : 'N/A'}ms. Output (first 100 chars): ${researchOutputText.substring(0,100)}`);
+    // console.log(`Gemini research for "${promptIdentifier}" on ${website} (model: ${modelNameForLog}) completed. Raw output: ${researchOutputText}`); // Log raw before parse
+    console.log(`Gemini research for "${promptIdentifier}" on ${website} (model: ${modelNameForLog}) completed. Output for parsing (first 100 chars): ${researchOutputText.substring(0,100)}`);
     return researchOutputText;
 
   } catch (error) {
