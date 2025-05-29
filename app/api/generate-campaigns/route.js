@@ -9,7 +9,7 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-// Initialize Google Gemini Client (only Flash model needed now)
+// Initialize Google Gemini Client (using Flash for all research)
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 let geminiFlashModel;
 
@@ -33,17 +33,17 @@ if (GEMINI_API_KEY) {
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Helper function to perform research with Gemini Flash model
-async function performResearchWithGeminiFlash(website, researchPromptObject) {
+async function performResearchWithGemini(website, researchPromptObject) { // Renamed for general use
   const promptIdentifier = researchPromptObject.promptName || 'unknown_research';
   const promptText = researchPromptObject.content;
 
-  if (!geminiFlashModel) {
+  if (!geminiFlashModel) { // Checks the single flash model instance
     console.error(`Gemini Flash model not initialized for "${promptIdentifier}" on ${website}.`);
     return JSON.stringify({ error: `Gemini Flash model for ${promptIdentifier} not configured` });
   }
 
   try {
-    const modelNameForLog = geminiFlashModel.model || "gemini-2.5-flash-preview";
+    const modelNameForLog = geminiFlashModel.model;
     console.log(`Starting Gemini research for "${promptIdentifier}" on ${website} using model: ${modelNameForLog}`);
     console.time(`${promptIdentifier}_${website}`);
 
@@ -52,7 +52,7 @@ async function performResearchWithGeminiFlash(website, researchPromptObject) {
       .replace('{domain}', website.replace(/https?:\/\//, '').replace('www.', ''))
       .replace('{company}', website.replace(/https?:\/\//, '').replace('www.', '').split('/')[0]);
     
-    const result = await geminiFlashModel.generateContent(fullPrompt);
+    const result = await geminiFlashModel.generateContent(fullPrompt); // Uses geminiFlashModel
     const response = result.response;
 
     if (!response || !response.candidates || response.candidates.length === 0 || !response.candidates[0].content || !response.candidates[0].content.parts || response.candidates[0].content.parts.length === 0) {
@@ -111,7 +111,7 @@ function safeJsonParse(jsonString, promptName = "unknown") {
 }
 
 // --- RESEARCH PROMPTS (for Gemini Flash) ---
-// Using the tweaked versions from above
+// Using the tweaked versions from the previous message
 const RESEARCH_PROMPTS = {
   homepage: {
     promptName: "HomepageAnalysis",
@@ -255,7 +255,8 @@ Ensure all string values are properly escaped.
   }
 };
 
-// --- CLAUDE'S METAPROMPT --- (Ensure this is the version updated for the new case study JSON structure)
+// --- CLAUDE'S METAPROMPT --- 
+// (This is the version updated for the `detailed_case_studies` structure)
 const METAPROMPT = `You are VeoGrowth's AI strategist analyzing a company's website to generate hyper-specific B2B cold email campaign ideas. You will produce EXACTLY the same format and quality as shown in the examples, with zero deviation.
 
 CRITICAL CONTEXT: VeoGrowth is an AI-powered lead generation agency that creates hyper-personalized cold email campaigns. We help companies book qualified meetings by understanding their prospects deeply and crafting messages that resonate.
@@ -271,7 +272,7 @@ NEVER FORGET RULES:
 3. Always use periods between sentences, never dashes
 4. Never start observations with "noticed" or "saw" - jump straight to the fact
 5. Make every observable fact specific and publicly findable
-6. If (!ResearchData.caseStudies.detailed_case_studies || ResearchData.caseStudies.detailed_case_studies.length === 0 || (ResearchData.caseStudies.search_summary_notes && (ResearchData.caseStudies.search_summary_notes.toLowerCase().includes("no") || ResearchData.caseStudies.search_summary_notes.toLowerCase().includes("limited") || ResearchData.caseStudies.search_summary_notes.toLowerCase().includes("scarce")))), ALWAYS add the warning note for social proof.
+6. If (!ResearchData.caseStudies.detailed_case_studies || ResearchData.caseStudies.detailed_case_studies.length === 0 || (ResearchData.caseStudies.search_summary_notes && (ResearchData.caseStudies.search_summary_notes.toLowerCase().includes("no") || ResearchData.caseStudies.search_summary_notes.toLowerCase().includes("limited") || ResearchData.caseStudies.search_summary_notes.toLowerCase().includes("scarce") || ResearchData.caseStudies.search_summary_notes.toLowerCase().includes("discovered")))), ALWAYS add the warning note for social proof.
 7. Target segments must be large (1,000+ prospects minimum)
 8. When focusing on personalization, don't forget natural vivid imagery
 9. For agencies: ALWAYS include specific execution details and valuable offers
@@ -297,7 +298,7 @@ Based on [Company]'s website analysis:
 - **Company size**: [Employee count/revenue based on ResearchData.homepage.target_audience.company_sizes or ResearchData.marketContext.company_growth_signals]
 - **Key characteristics**:
   - [Specific pain point from ResearchData.marketContext.pain_points_addressed_by_company (use first element if array) or inferred from ResearchData.homepage.product]
-  - [Another specific pain point or situation, perhaps from ResearchData.homepage.value_props]
+  - [Another specific pain point or situation, perhaps from ResearchData.homepage.value_props (use first element if array)]
   - [Use case from ResearchData.homepage.target_audience.use_cases]
   - [Characteristic related to ResearchData.homepage.features (pick one)]
   - [Characteristic related to ResearchData.marketContext.relevant_market_trends (pick one if available)]
@@ -325,7 +326,7 @@ Based on [Company]'s website analysis:
 ### **Campaign 2: "[Different Name]"**
 **Target**: [Different specific role] at [different segment]
 **Example email:**
-"Hi [Name], [different observable fact]. [Different insight or pain point]. [Company]'s [mechanism from ResearchData.homepage.mechanism or a key feature from ResearchData.homepage.features] [achieves outcome related to ResearchData.homepage.value_props (use first element if array)]. [IF ResearchData.caseStudies.detailed_case_studies && ResearchData.caseStudies.detailed_case_studies.length > 1, use ResearchData.caseStudies.detailed_case_studies[1].customer_name and a key result from its quantifiable_results_achieved, ELSE IF ResearchData.caseStudies.detailed_case_studies && ResearchData.caseStudies.detailed_case_studies.length > 0, re-iterate the first case study or use its supporting_quote_snippet, ELSE use a general benefit statement]. [Different conversational CTA?]"
+"Hi [Name], [different observable fact]. [Different insight or pain point]. [Company]'s [mechanism from ResearchData.homepage.mechanism or a key feature from ResearchData.homepage.features (pick one)] [achieves outcome related to ResearchData.homepage.value_props (use first element if array)]. [IF ResearchData.caseStudies.detailed_case_studies && ResearchData.caseStudies.detailed_case_studies.length > 1, use ResearchData.caseStudies.detailed_case_studies[1].customer_name and a key result from its quantifiable_results_achieved, ELSE IF ResearchData.caseStudies.detailed_case_studies && ResearchData.caseStudies.detailed_case_studies.length > 0, re-iterate the first case study or use its supporting_quote_snippet, ELSE use a general benefit statement]. [Different conversational CTA?]"
 
 ### **Campaign 3: "[Another Name]"**
 **Target**: [Third role] at [third segment]
@@ -748,7 +749,7 @@ export async function POST(req) {
 
     console.log('New lead:', { email, website, positioning, timestamp: new Date() });
 
-    if (!GEMINI_API_KEY || !geminiFlashModel ) { // Only check Flash model now
+    if (!GEMINI_API_KEY || !geminiFlashModel ) { 
         console.error("Critical: GEMINI_API_KEY not configured or Gemini Flash model failed to initialize. Aborting research.");
         return Response.json({ success: false, error: 'Research module not configured (API Key or Flash model init issue).' }, { status: 500 });
     }
@@ -756,9 +757,9 @@ export async function POST(req) {
     // Run research tasks in PARALLEL, ALL using Gemini Flash model
     console.log(`Starting PARALLEL Gemini research for ${website} (ALL TASKS WITH FLASH MODEL)...`);
     const [homepageDataString, caseStudyDataString, marketDataString] = await Promise.all([
-      performResearchWithGeminiFlash(website, RESEARCH_PROMPTS.homepage),      // Using Flash
-      performResearchWithGeminiFlash(website, RESEARCH_PROMPTS.caseStudies),     // Using Flash
-      performResearchWithGeminiFlash(website, RESEARCH_PROMPTS.marketContext)  // Using Flash
+      performResearchWithGemini(website, RESEARCH_PROMPTS.homepage),      
+      performResearchWithGemini(website, RESEARCH_PROMPTS.caseStudies),     
+      performResearchWithGemini(website, RESEARCH_PROMPTS.marketContext)  
     ]);
     console.log(`All PARALLEL Gemini research completed for ${website}.`);
 
@@ -874,4 +875,12 @@ export async function POST(req) {
       data: { company: companyNameFromUrl, positioning, analysis: formattedAnalysis }
     });
 
-  } catch (error)
+  } catch (error) {
+    console.error('API Error in POST function:', error);
+    return Response.json({ success: false, error: 'Failed to generate analysis. Please try again.' }, { status: 500 });
+  }
+}
+
+export async function GET() {
+  return Response.json({ message: 'VeoGrowth Campaign Generator API - Now with Gemini Powered Research!' });
+}
