@@ -826,12 +826,14 @@ export async function POST(req) {
     ]);
 
     // Combine research results
-    const combinedResearch = {
+    const combinedResearch = {  // <--- combinedResearch is DEFINED HERE
       homepage: homepageData ? JSON.parse(homepageData) : {},
       caseStudies: caseStudyData ? JSON.parse(caseStudyData) : {},
       marketContext: marketData ? JSON.parse(marketData) : {},
       website: website
     };
+
+    console.log('CLAUDE INPUT:', JSON.stringify(combinedResearch, null, 2)); // <--- LOG IT *AFTER* IT'S DEFINED
 
     // Determine positioning clarity
     const positioningAssessment = positioning === 'yes' ? 'clear' : positioning === 'no' ? 'unclear' : 'moderate';
