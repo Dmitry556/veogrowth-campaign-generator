@@ -264,12 +264,13 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
   try {
     const escapeHtml = (unsafe) => {
         if (typeof unsafe !== 'string') return '';
-        return unsafe
-             .replace(/&/g, "&")     // Replace & with &
-             .replace(/</g, "<")       // Replace < with <
-             .replace(/>/g, ">")       // Replace > with >
-             .replace(/"/g, """)  // Replace " with "
-             .replace(/'/g, "'"); // Replace ' with ' (or ')
+        let safe = unsafe;
+        safe = safe.replace(/&/g, "\u0026amp;"); // Ampersand
+        safe = safe.replace(/</g, "\u0026lt;");  // Less than
+        safe = safe.replace(/>/g, "\u0026gt;");  // Greater than
+        safe = safe.replace(/"/g, "\u0026quot;"); // Double quote
+        safe = safe.replace(/'/g, "\u0026#039;"); // Single quote (apostrophe)
+        return safe;
     };
     
     const emailHtmlForUser = `
