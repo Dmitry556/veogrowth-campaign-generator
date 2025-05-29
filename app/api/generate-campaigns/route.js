@@ -16,7 +16,7 @@ let geminiFlashModel;
 if (GEMINI_API_KEY) {
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
   geminiFlashModel = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash-preview-05-20", // Using Flash for all research tasks
+    model: "gemini-2.5-flash-preview-05-20", 
     safetySettings: [
       { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
       { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
@@ -33,11 +33,11 @@ if (GEMINI_API_KEY) {
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Helper function to perform research with Gemini Flash model
-async function performResearchWithGemini(website, researchPromptObject) { // Renamed for general use
+async function performResearchWithGemini(website, researchPromptObject) {
   const promptIdentifier = researchPromptObject.promptName || 'unknown_research';
   const promptText = researchPromptObject.content;
 
-  if (!geminiFlashModel) { // Checks the single flash model instance
+  if (!geminiFlashModel) {
     console.error(`Gemini Flash model not initialized for "${promptIdentifier}" on ${website}.`);
     return JSON.stringify({ error: `Gemini Flash model for ${promptIdentifier} not configured` });
   }
@@ -52,7 +52,7 @@ async function performResearchWithGemini(website, researchPromptObject) { // Ren
       .replace('{domain}', website.replace(/https?:\/\//, '').replace('www.', ''))
       .replace('{company}', website.replace(/https?:\/\//, '').replace('www.', '').split('/')[0]);
     
-    const result = await geminiFlashModel.generateContent(fullPrompt); // Uses geminiFlashModel
+    const result = await geminiFlashModel.generateContent(fullPrompt);
     const response = result.response;
 
     if (!response || !response.candidates || response.candidates.length === 0 || !response.candidates[0].content || !response.candidates[0].content.parts || response.candidates[0].content.parts.length === 0) {
@@ -105,13 +105,12 @@ function safeJsonParse(jsonString, promptName = "unknown") {
   try {
     return JSON.parse(jsonString);
   } catch (e) {
-    console.warn(`Failed to parse JSON string from Gemini for ${promptName}, returning error object. Details: ${e.message}. String (first 100 chars):`, jsonString.substring(0,100) + "...");
-    return { error: `Failed to parse JSON output from Gemini for ${promptName}.`, details: e.message, original_output_snippet: jsonString.substring(0,200) };
+    console.warn(`Failed to parse JSON string from Gemini or Claude for ${promptName}, returning error object. Details: ${e.message}. String (first 100 chars):`, jsonString.substring(0,100) + "...");
+    return { error: `Failed to parse JSON output for ${promptName}.`, details: e.message, original_output_snippet: jsonString.substring(0,200) };
   }
 }
 
 // --- RESEARCH PROMPTS (for Gemini Flash) ---
-// Using the tweaked versions from the previous message
 const RESEARCH_PROMPTS = {
   homepage: {
     promptName: "HomepageAnalysis",
@@ -256,450 +255,254 @@ Ensure all string values are properly escaped.
 };
 
 // --- CLAUDE'S METAPROMPT --- 
-// (This is the version updated for the `detailed_case_studies` structure)
-const METAPROMPT = `You are VeoGrowth's AI strategist analyzing a company's website to generate hyper-specific B2B cold email campaign ideas. You will produce EXACTLY the same format and quality as shown in the examples, with zero deviation.
+// MODIFIED TO REQUEST JSON OUTPUT AND UPDATED EXAMPLES
+const METAPROMPT = `You are VeoGrowth's AI strategist analyzing a company's website to generate hyper-specific B2B cold email campaign ideas.
+Follow all instructions and rules precisely.
 
 CRITICAL CONTEXT: VeoGrowth is an AI-powered lead generation agency that creates hyper-personalized cold email campaigns. We help companies book qualified meetings by understanding their prospects deeply and crafting messages that resonate.
 
-INPUTS PROVIDED:
-- Research Data: {research}
-- Website: {website}
-- Positioning Assessment: {positioning}
+INPUTS PROVIDED TO YOU (available in the {research} placeholder within this prompt):
+- Research Data: This is a JSON object containing three main keys: "homepage", "caseStudies", and "marketContext". Each of these keys holds structured information gathered by a research AI (Gemini). You will use this data extensively.
+  - ResearchData.homepage: Contains details about the company's product, features, target audience, etc., extracted from their homepage.
+  - ResearchData.caseStudies: Contains summaries of customer case studies, including problems faced, solutions, and quantifiable results, if found. Key: "detailed_case_studies" (an array).
+  - ResearchData.marketContext: Contains information about competitors, differentiators, pain points solved, etc.
+- Website: The primary URL of the company being analyzed (e.g., "{website}").
+- Positioning Assessment (User Input): A string indicating the user's view of their website's positioning clarity ("clear", "moderate", "unclear") - this is available as "{positioning}".
 
 NEVER FORGET RULES:
-1. NEVER use personal names from testimonials (say "Mars" not "Lumeng Jin")
-2. Email examples must be under 70 words
-3. Always use periods between sentences, never dashes
-4. Never start observations with "noticed" or "saw" - jump straight to the fact
-5. Make every observable fact specific and publicly findable
-6. If (!ResearchData.caseStudies.detailed_case_studies || ResearchData.caseStudies.detailed_case_studies.length === 0 || (ResearchData.caseStudies.search_summary_notes && (ResearchData.caseStudies.search_summary_notes.toLowerCase().includes("no") || ResearchData.caseStudies.search_summary_notes.toLowerCase().includes("limited") || ResearchData.caseStudies.search_summary_notes.toLowerCase().includes("scarce") || ResearchData.caseStudies.search_summary_notes.toLowerCase().includes("discovered")))), ALWAYS add the warning note for social proof.
-7. Target segments must be large (1,000+ prospects minimum)
-8. When focusing on personalization, don't forget natural vivid imagery
-9. For agencies: ALWAYS include specific execution details and valuable offers
-10. Show don't tell - demonstrate understanding through specifics
+1. NEVER use personal names from testimonials (say "Mars" or "a leading CPG company" not "Lumeng Jin from Mars").
+2. Email examples must be concise, ideally under 70 words.
+3. Always use periods between sentences. Never use dashes as sentence separators.
+4. Never start observations with "noticed" or "saw". Jump straight to the fact.
+5. Make every observable fact specific and publicly findable (or clearly derivable from the Research Data).
+6. If ResearchData.caseStudies.detailed_case_studies is empty or ResearchData.caseStudies.search_summary_notes indicates no good case studies were found, ALWAYS include the "socialProofNote" in your JSON output.
+7. Target segments must be substantial (1,000+ prospects minimum).
+8. When appropriate for personalization, use natural vivid imagery relevant to the prospect's pain.
+9. For agencies: ALWAYS include specific execution details and valuable offers in the "veoGrowthPitch".
+10. Show, don't tell: Demonstrate understanding through specifics drawn from ResearchData.
 
 VIVID IMAGERY GUIDELINES:
-- Use ONLY when it naturally fits and is hyper-relevant to the problem
-- Examples that work: "Sunday nights look like Excel hell", "10 hours watching videos of coffee cups sliding"
-- Don't force it - better to be clear than clever
-- The imagery should make the prospect think "that's exactly what happens"
+- Use ONLY when it naturally fits and is hyper-relevant to the problem.
+- Examples: "Sunday nights look like Excel hell", "10 hours watching videos of coffee cups sliding".
+- Don't force it. Clarity is paramount.
+- The imagery should make the prospect think "that's exactly what I'm dealing with".
 
-Generate output following this EXACT structure:
+<output_instructions>
+Your *ENTIRE RESPONSE* MUST be a single, minified JSON object. Do NOT include any text, explanations, or Markdown formatting before or after the JSON object.
+The JSON object must have the following top-level keys:
+"positioningAssessmentOutput": A string containing your 1-2 sentence positioning assessment.
+"idealCustomerProfile": An object with keys: "industry" (string), "companySize" (string), "keyCharacteristics" (array of 3-5 strings).
+"keyPersonas": An array of 2-3 objects, each with "title" (string) and "painPoints" (string, comma-separated list of 3-4 pain points).
+"campaignIdeas": An array of 3 objects, each with "name" (string, descriptive campaign name), "target" (string), and "emailBody" (string, the example email).
+"socialProofNote": A string for the social proof note if applicable (see rule 6), otherwise an empty string or null.
+"veoGrowthPitch": A string for the VeoGrowth pitch.
+"prospectTargetingNote": A string for the note about prospect targeting numbers.
 
-Based on [Company]'s website analysis:
-
-## **Positioning Assessment: [✅ CLEAR / ⚠️ MODERATELY CLEAR / ❌ UNCLEAR]**
-[1-2 sentences explaining why, mentioning specific strengths or gaps based on ResearchData.homepage.positioning_strength and your analysis of ResearchData.homepage]
-
----
-
-## **Your ICP appears to be:**
-- **Industry**: [Specific verticals based on ResearchData.homepage.target_audience.industries or your inference]
-- **Company size**: [Employee count/revenue based on ResearchData.homepage.target_audience.company_sizes or ResearchData.marketContext.company_growth_signals]
-- **Key characteristics**:
-  - [Specific pain point from ResearchData.marketContext.pain_points_addressed_by_company (use first element if array) or inferred from ResearchData.homepage.product]
-  - [Another specific pain point or situation, perhaps from ResearchData.homepage.value_props (use first element if array)]
-  - [Use case from ResearchData.homepage.target_audience.use_cases]
-  - [Characteristic related to ResearchData.homepage.features (pick one)]
-  - [Characteristic related to ResearchData.marketContext.relevant_market_trends (pick one if available)]
-
-## **Key Personas to Target:**
-
-**1. [Specific Title based on ResearchData.homepage.target_audience.job_titles or common for the ICP]**
-- Pain points: [Comma-separated list of 3-4 specific challenges relevant to this persona and the ResearchData, drawing from ResearchData.marketContext.pain_points_addressed_by_company and general knowledge]
-
-**2. [Different Title]**
-- Pain points: [Comma-separated list of 3-4 specific challenges]
-
-**3. [Another Title]**
-- Pain points: [Comma-separated list of 3-4 specific challenges]
-
----
-
-## **Campaign Ideas for [Company]:**
-
-### **Campaign 1: "[Descriptive Name]"**
-**Target**: [Specific role] at [specific company type with observable characteristic, informed by ResearchData]
-**Example email:**
-"Hi [Name], [specific observable fact about prospect company, try to relate to ResearchData.homepage.product or ResearchData.marketContext.pain_points_addressed_by_company (use first element if array)]. [Natural insight or vivid pain point]. [Company] helped [IF ResearchData.caseStudies.detailed_case_studies && ResearchData.caseStudies.detailed_case_studies.length > 0, use ResearchData.caseStudies.detailed_case_studies[0].customer_name, ELSE use 'a leading company in their space'] achieve [IF ResearchData.caseStudies.detailed_case_studies && ResearchData.caseStudies.detailed_case_studies.length > 0, pick a key result from ResearchData.caseStudies.detailed_case_studies[0].quantifiable_results_achieved.join(' and ') or describe the benefit from 'problem_faced' being solved by 'solution_provided_by_company', ELSE describe a plausible benefit related to ResearchData.homepage.product]. [Conversational CTA ending in ?]"
-
-### **Campaign 2: "[Different Name]"**
-**Target**: [Different specific role] at [different segment]
-**Example email:**
-"Hi [Name], [different observable fact]. [Different insight or pain point]. [Company]'s [mechanism from ResearchData.homepage.mechanism or a key feature from ResearchData.homepage.features (pick one)] [achieves outcome related to ResearchData.homepage.value_props (use first element if array)]. [IF ResearchData.caseStudies.detailed_case_studies && ResearchData.caseStudies.detailed_case_studies.length > 1, use ResearchData.caseStudies.detailed_case_studies[1].customer_name and a key result from its quantifiable_results_achieved, ELSE IF ResearchData.caseStudies.detailed_case_studies && ResearchData.caseStudies.detailed_case_studies.length > 0, re-iterate the first case study or use its supporting_quote_snippet, ELSE use a general benefit statement]. [Different conversational CTA?]"
-
-### **Campaign 3: "[Another Name]"**
-**Target**: [Third role] at [third segment]
-**Example email:**
-"Hi [Name], [third observable fact, perhaps related to ResearchData.marketContext.main_competitors_identified (use first element if array) if available]. [Third insight or pain point]. [Solution connection using ResearchData.homepage.product/features]. [IF ResearchData.caseStudies.detailed_case_studies && ResearchData.caseStudies.detailed_case_studies.length > 2, use ResearchData.caseStudies.detailed_case_studies[2].customer_name and a key result, ELSE IF ResearchData.caseStudies.detailed_case_studies && ResearchData.caseStudies.detailed_case_studies.length > 0, use a general benefit statement or a different aspect of an earlier case study, possibly its problem_faced]. [Third CTA?]"
-
----
-
-[IF !ResearchData.caseStudies.detailed_case_studies || ResearchData.caseStudies.detailed_case_studies.length === 0 || (ResearchData.caseStudies.search_summary_notes && (ResearchData.caseStudies.search_summary_notes.toLowerCase().includes("no") || ResearchData.caseStudies.search_summary_notes.toLowerCase().includes("limited") || ResearchData.caseStudies.search_summary_notes.toLowerCase().includes("scarce") || ResearchData.caseStudies.search_summary_notes.toLowerCase().includes("discovered"))), ADD THIS:]
-### ⚠️ **Note on Social Proof**: 
-*Our AI research (leveraging Google Search via Gemini) found limited or no detailed customer case studies with specific quantifiable metrics for {website}. The AI research notes: "{ResearchData.caseStudies.search_summary_notes}". The examples above may use hypothetical scenarios or generalized benefits based on the company's product description. When we work together, you'll provide us with your real customer success stories, metrics, and testimonials to make these campaigns authentic and powerful.*
-
-**Want VeoGrowth to execute these campaigns?**  
-We'll [specific action related to their ICP] and [specific outcome related to their value prop].
-
-[Book a Strategy Call →]
-
-*Note: These campaigns would target approximately [X,000-Y,000] qualified prospects [specific description of who and why they're qualified, informed by ResearchData].*
+Refer to the ResearchData object (passed in {research}) extensively to populate these fields.
+Example of the overall JSON structure you need to return (content will vary based on {research} and {website}):
+{
+  "positioningAssessmentOutput": "✅ CLEAR: {website} clearly communicates its value proposition for [target audience] by focusing on [key benefit from ResearchData.homepage.value_props]. The messaging is consistent.",
+  "idealCustomerProfile": {
+    "industry": "[Derived from ResearchData.homepage.target_audience.industries]",
+    "companySize": "[Derived from ResearchData.homepage.target_audience.company_sizes]",
+    "keyCharacteristics": [
+      "[Pain point from ResearchData.marketContext.pain_points_addressed_by_company]",
+      "[Use case from ResearchData.homepage.target_audience.use_cases]",
+      "[Need related to ResearchData.homepage.features]",
+      "[Another characteristic based on ResearchData]",
+      "[Market trend from ResearchData.marketContext.relevant_market_trends if applicable]"
+    ]
+  },
+  "keyPersonas": [
+    { "title": "[Title from ResearchData.homepage.target_audience.job_titles or inferred]", "painPoints": "Challenge 1, Challenge 2, Challenge 3" },
+    { "title": "[Another relevant title]", "painPoints": "Issue A, Issue B, Issue C" }
+  ],
+  "campaignIdeas": [
+    {
+      "name": "[Descriptive Campaign Name 1]",
+      "target": "[Target persona 1] at [company type from ResearchData, e.g., B2B SaaS with specific observable characteristic]",
+      "emailBody": "Hi [Name], [Observable fact about prospect's company, related to ResearchData.homepage.product]. [Vivid pain point]. {website} helped [Customer name from ResearchData.caseStudies.detailed_case_studies[0].customer_name, or fallback] achieve [Result from ResearchData.caseStudies.detailed_case_studies[0].quantifiable_results_achieved, or fallback]. [CTA?]"
+    },
+    {
+      "name": "[Descriptive Campaign Name 2]",
+      "target": "[Target persona 2] at [different company type]",
+      "emailBody": "Hi [Name], [Different observable fact]. [Different pain point]. Using {website}'s [feature from ResearchData.homepage.features], companies like [Customer name from ResearchData.caseStudies.detailed_case_studies[1].customer_name, or fallback] saw [Result from ResearchData.caseStudies.detailed_case_studies[1].quantifiable_results_achieved, or fallback]. [Different CTA?]"
+    },
+    {
+      "name": "[Descriptive Campaign Name 3]",
+      "target": "[Target persona 3] at [third company type]",
+      "emailBody": "Hi [Name], [Third observable fact, perhaps related to competitor from ResearchData.marketContext.main_competitors_identified]. [Pain point]. {website} addresses this by [solution from ResearchData.homepage.mechanism or value_prop]. [Customer example or general benefit]. [Third CTA?]"
+    }
+  ],
+  "socialProofNote": "[Generate this note if rule 6 applies, using ResearchData.caseStudies.search_summary_notes if available, otherwise empty string]",
+  "veoGrowthPitch": "Want VeoGrowth to execute these campaigns? We'll [specific action related to ICP] and [specific outcome related to value prop].",
+  "prospectTargetingNote": "Note: These campaigns would target approximately [X,000-Y,000] qualified prospects [specific description of who and why they're qualified, informed by ResearchData]."
+}
+Ensure all string values in your JSON output are properly escaped (e.g., newlines as \\n, quotes as \\").
+The examples below (EXAMPLE 1, EXAMPLE 2, etc.) are for style and content guidance for each section of *your* JSON output. Do not just copy them; adapt their content quality and specificity using the provided {research} data.
+</output_instructions>
 
 ---
 EXAMPLE 1 - SaaS with Clear Positioning (IXON):
-
-Based on IXON's website analysis:
-
-## **Positioning Assessment: ✅ CLEAR**
-IXON has excellent positioning as an Industrial IoT platform specifically for machine builders, with clear value props around secure remote access, machine insights, and service efficiency.
-
----
-
-## **Your ICP appears to be:**
-- **Industry**: Machine builders/OEMs (industrial equipment manufacturers)
-- **Company size**: 50-500 employees (mid-market manufacturers)
-- **Key characteristics**:
-  - Build complex industrial machines requiring remote support
-  - Have field service teams traveling to customer sites
-  - Face pressure to reduce service costs and improve uptime
-  - Need to comply with security standards (ISO, IEC, NIS2)
-  - Expanding globally with machines in multiple countries
-
-## **Key Personas to Target:**
-
-**1. VP of Service / Service Manager**
-- Pain points: High travel costs, slow response times, technician productivity, customer satisfaction
-
-**2. CTO / Head of Engineering**
-- Pain points: Security compliance, data collection from machines, building competitive advantages
-
-**3. Field Service Manager**
-- Pain points: Managing distributed technicians, reducing truck rolls, first-time fix rates
-
----
-
-## **Campaign Ideas for IXON:**
-
-### **Campaign 1: "Travel Cost Crusher"**
-**Target**: VP of Service at machine builders with 10+ field technicians
-
-**Example email:**
-"Hi Mark, manufacturing packaging equipment with 15 field techs covering North America means travel probably eats 40% of service budget. IXON's secure remote access lets technicians fix issues from their desk. Repak cut on-site visits by 70%. Worth exploring?"
-
-### **Campaign 2: "Compliance Without Complexity"**
-**Target**: CTOs at machine builders selling to automotive/pharma
-
-**Example email:**
-"Hi Sarah, supplying assembly systems to automotive plants means facilities demand NIS2 and ISO compliance for any remote access. Most VPN solutions create security nightmares. IXON provides bank-grade security that IT departments actually approve. Vapormatt implemented without a single security audit finding. Interested?"
-
-### **Campaign 3: "First-Time Fix Rate Booster"**
-**Target**: Field Service Managers with global installations
-
-**Example email:**
-"Hi Tom, managing service for CNC machines across 30 countries means constant firefighting. When technicians arrive on-site without knowing the real issue, first-time fix rates plummet. IXON's Machine Insights showed HoSt exactly what's wrong before dispatch. They say troubleshooting speed increased 10x. Want to see how?"
+This section now guides the *content* of your JSON output if the input were like IXON.
+If the {research} data was for IXON (hypothetically):
+The "positioningAssessmentOutput" string would be: "✅ CLEAR. IXON has excellent positioning as an Industrial IoT platform specifically for machine builders, with clear value props around secure remote access, machine insights, and service efficiency."
+The "idealCustomerProfile" object would be:
+{
+  "industry": "Machine builders/OEMs (industrial equipment manufacturers)",
+  "companySize": "50-500 employees (mid-market manufacturers)",
+  "keyCharacteristics": [
+    "Build complex industrial machines requiring remote support",
+    "Have field service teams traveling to customer sites",
+    "Face pressure to reduce service costs and improve uptime",
+    "Need to comply with security standards (ISO, IEC, NIS2)",
+    "Expanding globally with machines in multiple countries"
+  ]
+}
+The "keyPersonas" array would contain objects like:
+[
+  { "title": "VP of Service / Service Manager", "painPoints": "High travel costs, slow response times, technician productivity, customer satisfaction" },
+  { "title": "CTO / Head of Engineering", "painPoints": "Security compliance, data collection from machines, building competitive advantages" },
+  { "title": "Field Service Manager", "painPoints": "Managing distributed technicians, reducing truck rolls, first-time fix rates" }
+]
+The "campaignIdeas" array would contain 3 campaign objects, for example, the first one:
+{
+  "name": "Travel Cost Crusher",
+  "target": "VP of Service at machine builders with 10+ field technicians",
+  "emailBody": "Hi Mark, manufacturing packaging equipment with 15 field techs covering North America means travel probably eats 40% of service budget. IXON's secure remote access lets technicians fix issues from their desk. Repak cut on-site visits by 70%. Worth exploring?"
+}
+... (and two other campaign objects for IXON) ...
+The "socialProofNote" would be an empty string if IXON had case studies in ResearchData.
+The "veoGrowthPitch": "Want VeoGrowth to execute these campaigns? We'll build targeted lists of machine builders struggling with service costs and craft messages that resonate with their specific challenges."
+The "prospectTargetingNote": "Note: These campaigns would target approximately 3,000-5,000 qualified prospects across North America and Europe, focusing on mid-market manufacturers with distributed equipment."
 
 ---
-
-**Want VeoGrowth to execute these campaigns?**  
-We'll build targeted lists of machine builders struggling with service costs and craft messages that resonate with their specific challenges.
-
-[Book a Strategy Call →]
-
-*Note: These campaigns would target approximately 3,000-5,000 qualified prospects across North America and Europe, focusing on mid-market manufacturers with distributed equipment.*
-
 EXAMPLE 2 - SaaS with Unclear Positioning (Tourmo):
-
-Based on Tourmo.ai's website analysis:
-
-## **Positioning Assessment: ⚠️ MODERATELY CLEAR**
-Tourmo positions as an AI fleet management platform that integrates with existing systems, but the messaging covers many features without a single compelling focus. The "no rip and replace" angle is strong but gets lost among numerous capabilities.
-
----
-
-## **Your ICP appears to be:**
-- **Industry**: Transportation, logistics, delivery, field service companies
-- **Company size**: 100-1000+ vehicle fleets
-- **Key characteristics**:
-  - Already invested in telematics/cameras but getting poor ROI
-  - Multiple disconnected fleet systems (fuel cards, cameras, telematics)
-  - Struggling with driver safety scores and false positives
-  - Manual processes eating up manager time
-  - Pressure to reduce accidents, fuel costs, and insurance premiums
-
-## **Key Personas to Target:**
-
-**1. VP of Fleet Operations**
-- Pain points: Too many systems to manage, poor data quality, can't prove ROI on fleet tech investments
-
-**2. Director of Safety**
-- Pain points: False positive alerts, reactive vs proactive coaching, insurance costs rising
-
-**3. Fleet Manager**
-- Pain points: Drowning in alerts, manual tasks, no time for strategic work
+If {research} data was for Tourmo:
+"positioningAssessmentOutput": "⚠️ MODERATELY CLEAR. Tourmo positions as an AI fleet management platform that integrates with existing systems, but the messaging covers many features without a single compelling focus. The 'no rip and replace' angle is strong but gets lost among numerous capabilities."
+... (similar structured JSON breakdown for Tourmo's ICP, Personas, Campaigns as shown for IXON, adapting content) ...
+"socialProofNote": "Our AI research (leveraging Google Search via Gemini) found limited or no detailed customer case studies for Tourmo. The AI research notes: '[Content from ResearchData.caseStudies.search_summary_notes for Tourmo]'. The examples above may use hypothetical scenarios. When we work together, you'll provide real customer success stories."
+"additionalRecommendations": "Consider leading with ONE killer use case (like 'Stop drowning in false positive alerts') rather than trying to communicate all capabilities upfront. The 'no rip and replace' message is gold but needs to be tied to a specific, painful problem." // Optional new field if you want such recommendations. For now, stick to the defined schema.
 
 ---
-
-## **Campaign Ideas for Tourmo.ai:**
-
-### **Campaign 1: "The False Positive Eliminator"**
-**Target**: Fleet Safety Directors at companies with 200+ vehicles using Samsara/Motive
-
-**Example email:**
-"Hi Jessica, with 300 trucks running Samsara cameras, team probably reviews 50+ false hard-braking alerts daily. That's 10 hours weekly watching videos of coffee cups sliding. Tourmo's AI filters out 89% of false positives without replacing cameras. One logistics fleet freed up 3 safety managers for actual coaching. Want to stop the alert fatigue?"
-
-### **Campaign 2: "Hidden Fuel Theft Detector"**
-**Target**: CFOs at trucking companies with 500+ vehicles
-
-**Example email:**
-"Hi Robert, managing fuel for 500 trucks across multiple card providers means ghost transactions hide easily. Most fleets lose 2-3% to fuel fraud they never catch. Tourmo identifies suspicious transactions without changing fuel cards. [We'd insert your real customer metric here]. Interested in a fraud audit of your fuel data?"
-
-### **Campaign 3: "Fleet Tech ROI Rescue"**
-**Target**: VP Operations at companies with 3+ disconnected fleet systems
-
-**Example email:**
-"Hi David, running Geotab for tracking, Lytx for cameras, and WEX for fuel probably involves spreadsheet gymnastics every Monday. Meanwhile, the board questions why fleet tech costs $500K annually. Tourmo unifies existing systems and finally proves ROI. No hardware changes needed. Worth a conversation?"
+EXAMPLE 3 - Agency with Hyper-Personalization (ConversionLab):
+... (structured JSON breakdown for ConversionLab) ...
 
 ---
-
-### ⚠️ **Note on Social Proof**: 
-*We didn't find specific customer case studies on your website, so the examples above use hypothetical scenarios. When we work together, you'll provide us with your real customer success stories, metrics, and testimonials to make these campaigns authentic and powerful.*
-
-## **Positioning Recommendation:**
-Consider leading with ONE killer use case (like "Stop drowning in false positive alerts") rather than trying to communicate all capabilities upfront. The "no rip and replace" message is gold but needs to be tied to a specific, painful problem.
-
-**Want VeoGrowth to execute these campaigns?**  
-We'll build targeted lists of fleet managers already using your competitors' systems and craft messages that resonate with their specific tech stack challenges.
-
-[Book a Strategy Call →]
-
-*Note: These campaigns would target approximately 5,000-8,000 qualified prospects, focusing on fleets already invested in technology but struggling to get value from it.*
-
-EXAMPLE 3 - Agency with Hyper-Personalization:
-
-Based on ConversionLab's website analysis:
-
-## **Positioning Assessment: ✅ CLEAR**
-ConversionLab has strong positioning as a CRO agency for ecommerce brands, with clear case studies showing specific conversion lifts and revenue gains for DTC brands.
+EXAMPLE 4 - SEO Agency with Specific Execution (RankRise):
+... (structured JSON breakdown for RankRise) ...
 
 ---
+EXAMPLE 5 - Email Marketing Agency with Deep Personalization (FlowMasters):
+... (structured JSON breakdown for FlowMasters) ...
 
-## **Your ICP appears to be:**
-- **Industry**: Direct-to-consumer ecommerce brands
-- **Company size**: $5M-$50M annual revenue
-- **Key characteristics**:
-  - Decent traffic but conversion rates below 3%
-  - Selling on Shopify or similar platforms
-  - Have product-market fit but struggling to scale profitably
-  - Spending heavily on ads with rising CAC
-  - Know they need CRO but unsure where to start
-
-## **Key Personas to Target:**
-
-**1. Founder/CEO**
-- Pain points: Conversion rate plateaued, CAC rising, need to improve unit economics before raising
-
-**2. Head of Ecommerce/Digital**
-- Pain points: Pressure to hit revenue targets, too many optimization ideas, no clear testing roadmap
-
-**3. CMO/VP Marketing**
-- Pain points: Justifying ad spend, improving ROAS, competing priorities between acquisition and conversion
-
----
-
-## **Campaign Ideas for ConversionLab:**
-
-### **Campaign 1: "The Conversion Audit Special"**
-**Target**: Ecommerce founders doing $10M+ with sub-3% conversion rates
-
-**Example email:**
-"Hi Mike, [Brand] converting at 2.3% with that beautiful product photography and story. Spent 20 minutes on your site - love how you showcase the sustainability angle. Few quick wins I spotted: your reviews sit below the fold (usually +15% moving them up), cart abandonment popup triggers too late (10 seconds vs optimal 3), and your size guide hides in footer (floating button typically +8% on apparel). Gymshark went from 2.1% to 3.8% with similar fixes. Want us to do a full 50-point audit video walking through every opportunity? Takes us 2 hours, completely free, you keep it forever. Interested?"
-
-### **Campaign 2: "The Holiday Revenue Maximizer"**
-**Target**: CMOs at DTC brands approaching Q4
-
-**Example email:**
-"Hi Sarah, [Brand]'s BFCM landing page from last year had smart countdown timers but checkout still took 4 steps. Noticed you're testing new bundles - smart move. For Black Friday, we'd suggest: single-page checkout (usually +22% conversion), exit intent with SMS capture (Glossier added $1.2M this way), and dynamic bundles based on cart value. We helped 12 brands average 47% more revenue last BFCM. Happy to share our exact 21-day pre-launch checklist and walk through how we'd customize it for [Brand]'s specific situation?"
-
-### **Campaign 3: "The Mobile Conversion Fix"**
-**Target**: Heads of Ecommerce seeing 70%+ mobile traffic
-
-**Example email:**
-"Hi Tom, [Brand]'s mobile experience actually loads fast (nice job on the 2.1s speed). But that sticky add-to-cart button disappears on your bestsellers page, and the image zoom makes products blurry on iPhone. Your competitor Allbirds fixed these exact issues and went from 1.8% to 3.2% mobile conversion. We've got a whole mobile playbook - thumb-friendly buttons, smart quick-buy options, Apple Pay optimization. Want to see a Loom video showing exactly what we'd fix on [Brand]'s mobile experience and expected conversion lift for each change?"
-
----
-
-**Want VeoGrowth to execute these campaigns?**  
-We'll identify ecommerce brands with traffic but poor conversion and show them exactly how to turn more visitors into customers.
-
-[Book a Strategy Call →]
-
-*Note: These campaigns would target approximately 4,000-6,000 qualified DTC brands doing $5M+ revenue, focusing on those with conversion optimization opportunities.*
-
-EXAMPLE 4 - SEO Agency with Specific Execution:
-
-Based on RankRise's website analysis:
-
-## **Positioning Assessment: ✅ CLEAR**
-RankRise specializes in SEO for B2B SaaS companies, with strong case studies showing organic traffic growth and pipeline attribution.
-
----
-
-## **Your ICP appears to be:**
-- **Industry**: B2B SaaS companies
-- **Company size**: Series A to Series C (20-200 employees)
-- **Key characteristics**:
-  - Creating good content but not ranking
-  - Competitors dominating search results
-  - No clear SEO strategy beyond "write more blogs"
-  - Marketing team stretched thin
-  - Need to show organic pipeline contribution
-
-## **Key Personas to Target:**
-
-**1. VP/Director of Marketing**
-- Pain points: SEO takes forever to show results, hard to justify investment, competing priorities
-
-**2. Head of Content/Demand Gen**
-- Pain points: Great content buried on page 3, no technical SEO knowledge, keyword research guesswork
-
-**3. Founder/CEO (smaller companies)**
-- Pain points: Losing deals to competitors who rank, organic as sustainable growth channel, limited budget
-
----
-
-## **Campaign Ideas for RankRise:**
-
-### **Campaign 1: "The Competitor Gap Analysis"**
-**Target**: Marketing directors at B2B SaaS losing organic traffic to competitors
-
-**Example email:**
-"Hi Sarah, Ahrefs shows [Competitor] ranking for 847 keywords that [Company] could own. They're getting ~12K visitors monthly from terms like "employee scheduling software" and "shift planning tools." Your blog content is actually deeper - especially that piece on schedule optimization. You're missing: dedicated comparison pages (/vs-when-i-work), a glossary section for definition searches, and integration pages for your top 10 partners. Scheduling software company Homebase built these exact pages and went from position 19 to top 3 in 4 months. Want me to run a full gap analysis showing which 20 pages would capture the most traffic from [Competitor]?"
-
-### **Campaign 2: "The Technical SEO Quick Wins"**
-**Target**: SaaS companies with 100+ blog posts but poor rankings
-
-**Example email:**
-"Hi Mark, [Company] has 200+ quality blog posts but Screaming Frog shows 1,400 technical issues holding you back. The big ones: 89 pages with duplicate titles (confusing Google), your /resources section isn't in the sitemap (invisible to crawlers), and load time hits 4.8 seconds on mobile. ProjectManagement.com fixed similar issues and saw 67% more organic traffic in 60 days without writing a single new post. I recorded a Loom showing your top 10 technical fixes in priority order - each with expected impact. Want to see it?"
-
-### **Campaign 3: "The Link Velocity Builder"**
-**Target**: Series B SaaS companies with good content but weak domain authority
-
-**Example email:**
-"Hi Jessica, [Company]'s product marketing content is solid but you're stuck at DR 42 while competitors average DR 65. Majestic shows you getting 2-3 backlinks monthly while [Competitor] gets 45+. They're doing digital PR - turning product updates into TechCrunch mentions. Your recent AI feature launch was perfect for this but only got 3 links. We helped Lattice go from DR 38 to 71 in 18 months using our journalist database and proven pitch templates. Want to see exactly which 15 publications would likely cover [Company]'s next feature launch?"
-
----
-
-**Want VeoGrowth to execute these campaigns?**  
-We'll find B2B SaaS companies creating content but losing the SEO war and show them exactly how to outrank their competitors.
-
-[Book a Strategy Call →]
-
-*Note: These campaigns would target approximately 5,000-7,000 qualified B2B SaaS companies with content marketing efforts but poor organic visibility.*
-
-EXAMPLE 5 - Email Marketing Agency with Deep Personalization:
-
-Based on FlowMasters' website analysis:
-
-## **Positioning Assessment: ✅ CLEAR**
-FlowMasters positions as the email marketing agency for ecommerce brands looking to scale revenue through automation and segmentation.
-
----
-
-## **Your ICP appears to be:**
-- **Industry**: Ecommerce brands (fashion, beauty, lifestyle)
-- **Company size**: $2M-$20M annual revenue
-- **Key characteristics**:
-  - Email list of 10K+ but low engagement
-  - Using basic Klaviyo/Mailchimp features only
-  - Email revenue under 20% of total
-  - One welcome email then blast campaigns
-  - Know email could do more but lack expertise/time
-
-## **Key Personas to Target:**
-
-**1. Ecommerce Founder/Owner**
-- Pain points: Email feels like constant work for little return, leaving money on table, competitors doing it better
-
-**2. Email Marketing Manager**
-- Pain points: Stuck doing daily campaigns, no time for strategy, don't know advanced features
-
-**3. Head of Ecommerce**
-- Pain points: Email attribution unclear, revenue per recipient declining, list growth stalled
-
----
-
-## **Campaign Ideas for FlowMasters:**
-
-### **Campaign 1: "The Revenue Recovery Sequence"**
-**Target**: DTC brands with 20K+ email list but under 15% email revenue
-
-**Example email:**
-"Hi Lauren, [Brand]'s welcome email with the founder story about your rescue dog sanctuary is perfect - that authentic voice really connects. But then subscribers get nothing for 2 weeks until your next sale. Brands with similar AOV to yours ($85) typically see 29% more revenue with a 5-email welcome series: expand the rescue story, showcase your eco-friendly process, customer transformation stories, behind-the-scenes of your Denver workshop, then soft discount. Chubbies built their $100M business perfecting this flow. Want me to map out the exact 5-email sequence we'd build for [Brand] with subject lines and preview text?"
-
-### **Campaign 2: "The Segmentation Gold Mine"**
-**Target**: Beauty/skincare brands sending batch-and-blast campaigns
-
-**Example email:**
-"Hi Ashley, [Brand] has 45K subscribers but your last campaign shows 2,200 Gmail clips. That means 43K people didn't even see it. Noticed you sell both anti-aging and acne products - but everyone gets the same emails? Your Shopify data is a goldmine: segment by skin concern, purchase history, AOV. Glossier sends 27 different versions of each campaign. Their acne-prone segment gets ingredient education, mature skin gets routine tips. Opens went from 18% to 34%. I can show you exactly how to segment your list based on your specific product lines - want to see the strategy?"
-
-### **Campaign 3: "The Win-Back Automation"**
-**Target**: Subscription box companies with high churn
-
-**Example email:**
-"Hi Chris, [Brand]'s subscription model is smart but Recharge shows 68% churn after month 3. Your cancellation email just says "sorry to see you go" - missing huge opportunity. FabFitFun wins back 23% of cancellations with a 4-email sequence: survey why they left, address that specific concern, show new products they missed, special "come back" offer. Your tea subscription could do: flavor preferences survey, limited edition blend announcement, customer story about finding their perfect tea, 30% off return offer. Want the exact automation flow we'd build with timing and triggers mapped out?"
-
----
-
-**Want VeoGrowth to execute these campaigns?**  
-We'll identify ecommerce brands underutilizing email and show them exactly how to turn their list into a revenue engine.
-
-[Book a Strategy Call →]
-
-*Note: These campaigns would target approximately 6,000-8,000 qualified ecommerce brands with established email lists but poor email revenue contribution.*
-
-Remember: The quality bar is EXTREMELY high. Every campaign idea must feel like it required hours of research and deep industry knowledge. The prospect should think "how do they know exactly what I'm dealing with?"
-
-For agencies especially: ALWAYS include specific things found on their site, exact execution plans, and valuable free offers.`;
+Remember: The quality bar is EXTREMELY high. Every campaign idea must feel like it required hours of research and deep industry knowledge, drawing from the {research} data. The prospect should think "how do they know exactly what I'm dealing with?"
+For agencies especially: ALWAYS include specific things found on their site (from {research}), exact execution plans, and valuable free offers in the campaign emails.
+Your entire output MUST be only the single JSON object.
+`;
 
 // --- Function to send email with analysis ---
-async function sendEmailReport(email, analysis, company) {
+async function sendEmailReport(email, companyName, claudeAnalysisJson, geminiResearchJson) { // Now takes structured JSON
+  // This function will need to be updated to build HTML from the JSON objects
+  // For now, let's just send a simplified version or the raw JSON for debugging.
+  // In a real implementation, you'd iterate through claudeAnalysisJson to build nice HTML.
+  
+  let analysisHtml = `<h1>Campaign Analysis for ${companyName}</h1>`;
+  analysisHtml += `<h2>Positioning Assessment</h2><p>${claudeAnalysisJson.positioningAssessmentOutput || 'N/A'}</p>`;
+  analysisHtml += `<h2>Ideal Customer Profile</h2><pre>${JSON.stringify(claudeAnalysisJson.idealCustomerProfile || {}, null, 2)}</pre>`;
+  analysisHtml += `<h2>Key Personas</h2><pre>${JSON.stringify(claudeAnalysisJson.keyPersonas || [], null, 2)}</pre>`;
+  analysisHtml += `<h2>Campaign Ideas</h2>`;
+  if (claudeAnalysisJson.campaignIdeas && claudeAnalysisJson.campaignIdeas.length > 0) {
+    claudeAnalysisJson.campaignIdeas.forEach(campaign => {
+      analysisHtml += `<div><h4>${campaign.name}</h4><p><strong>Target:</strong> ${campaign.target}</p><p><em>Email:</em> ${campaign.emailBody}</p></div>`;
+    });
+  }
+  if (claudeAnalysisJson.socialProofNote) {
+    analysisHtml += `<h3>Social Proof Note</h3><p>${claudeAnalysisJson.socialProofNote}</p>`;
+  }
+  // ... and so on for veoGrowthPitch, prospectTargetingNote.
+  // This is a placeholder; a proper HTML email would be more styled.
+
   try {
-    const emailHtml = `
+    const emailHtmlForUser = `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 700px; margin: 0 auto; padding: 20px; }
+          h1, h2, h3, h4 { color: #1f2937; }
+          h2 { margin-top: 30px; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;}
+          h3 { margin-top: 20px; color: #4f46e5; }
+          h4 { margin-top: 15px; color: #1f2937; }
+          .campaign-card { background: #f9fafb; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #e5e7eb;}
+          .email-body { background: #ffffff; padding: 10px; border-left: 3px solid #4f46e5; margin-top: 5px; white-space: pre-line; font-style: italic;}
+          .note { background: #fef3c7; border-left: 3px solid #f59e0b; padding: 10px; margin-top: 15px; }
+          .pitch-section { background: #4f46e5; color: white; padding: 20px; border-radius: 8px; text-align: center; margin-top:30px; }
+          .pitch-section h2 { color: white; border: none;}
+          .pitch-section a { display: inline-block; background: white; color: #4f46e5; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold; margin-top:15px;}
+        </style>
       </head>
-      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <body>
         <div style="text-align: center; margin-bottom: 40px;">
-          <h1 style="color: #1f2937; margin: 0;">VeoGrowth</h1>
+          <h1 style="margin: 0;">VeoGrowth</h1>
           <p style="color: #6b7280; margin-top: 5px;">AI-Powered B2B Lead Generation</p>
         </div>
 
-        <div style="background: #f9fafb; padding: 30px; border-radius: 10px; margin-bottom: 30px;">
-          <h2 style="color: #1f2937; margin-top: 0;">Your Campaign Analysis for ${company}</h2>
-          <p style="color: #4b5563;">Thank you for using VeoGrowth's Campaign Generator! We've analyzed your website and created three hyper-personalized cold email campaigns targeting your ideal customers.</p>
+        <div style="background: #f9fafb; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+          <h2 style="margin-top: 0; border:none;">Your Campaign Analysis for ${companyName}</h2>
+          <p style="color: #4b5563;">Thank you for using VeoGrowth! Here's the AI-generated analysis:</p>
         </div>
 
-        <div style="background: white; padding: 30px; border: 1px solid #e5e7eb; border-radius: 10px; margin-bottom: 30px;">
-          ${analysis}
+        <div>
+          <h2>Positioning Assessment</h2>
+          <p>${claudeAnalysisJson.positioningAssessmentOutput || 'Not available.'}</p>
+
+          <h2>Ideal Customer Profile</h2>
+          <p><strong>Industry:</strong> ${claudeAnalysisJson.idealCustomerProfile?.industry || 'N/A'}</p>
+          <p><strong>Company Size:</strong> ${claudeAnalysisJson.idealCustomerProfile?.companySize || 'N/A'}</p>
+          <p><strong>Key Characteristics:</strong></p>
+          <ul>${(claudeAnalysisJson.idealCustomerProfile?.keyCharacteristics || []).map(char => `<li>${char}</li>`).join('')}</ul>
+
+          <h2>Key Personas</h2>
+          ${(claudeAnalysisJson.keyPersonas || []).map(persona => `
+            <div class="campaign-card" style="background:#eef2ff; border-left: 3px solid #6366f1;">
+              <h4>${persona.title}</h4>
+              <p><strong>Pain Points:</strong> ${persona.painPoints}</p>
+            </div>
+          `).join('')}
+
+          <h2>Campaign Ideas</h2>
+          ${(claudeAnalysisJson.campaignIdeas || []).map(campaign => `
+            <div class="campaign-card">
+              <h3>${campaign.name}</h3>
+              <p><strong>Target:</strong> ${campaign.target}</p>
+              <p><strong>Example Email:</strong></p>
+              <div class="email-body">${campaign.emailBody.replace(/\n/g, '<br>')}</div>
+            </div>
+          `).join('')}
+
+          ${claudeAnalysisJson.socialProofNote ? `
+            <div class="note">
+              <h4>⚠️ Note on Social Proof</h4>
+              <p>${claudeAnalysisJson.socialProofNote}</p>
+            </div>
+          ` : ''}
+          
+          <div style="margin-top:30px; padding-top:20px; border-top:1px solid #e5e7eb;">
+            <p><strong>VeoGrowth Pitch:</strong> ${claudeAnalysisJson.veoGrowthPitch || ''}</p>
+            <p><em>${claudeAnalysisJson.prospectTargetingNote || ''}</em></p>
+          </div>
         </div>
 
-        <div style="background: #4f46e5; color: white; padding: 30px; border-radius: 10px; text-align: center; margin-bottom: 30px;">
-          <h2 style="margin-top: 0; margin-bottom: 15px;">Ready to Execute These Campaigns?</h2>
-          <p style="margin-bottom: 20px; opacity: 0.9;">VeoGrowth will implement these campaigns for you:</p>
-          <ul style="text-align: left; max-width: 400px; margin: 0 auto 25px; padding-left: 20px;">
-            <li style="margin-bottom: 10px;">Build targeted lists (3,000-5,000 prospects)</li>
-            <li style="margin-bottom: 10px;">Craft hyper-personalized messages for each</li>
-            <li style="margin-bottom: 10px;">Book qualified meetings in your calendar</li>
-            <li>Only pay for meetings that show up</li>
-          </ul>
-          <a href="https://calendly.com/veogrowth/strategy" style="display: inline-block; background: white; color: #4f46e5; padding: 15px 35px; border-radius: 5px; text-decoration: none; font-weight: bold;">Book Your Strategy Call</a>
+        <div class="pitch-section">
+          <h2>Ready to Execute These Campaigns?</h2>
+          <p>VeoGrowth will implement these campaigns for you: Build targeted lists, craft hyper-personalized messages, and book qualified meetings.</p>
+          <a href="https://calendly.com/veogrowth/strategy">Book a Strategy Call</a>
         </div>
 
-        <div style="text-align: center; color: #6b7280; font-size: 14px;">
+        <div style="text-align: center; color: #6b7280; font-size: 14px; margin-top:30px;">
           <p>Questions? Reply to this email and I'll personally respond.</p>
           <p style="margin-top: 20px;">
             Best regards,<br>
@@ -714,8 +517,8 @@ async function sendEmailReport(email, analysis, company) {
     const { data, error } = await resend.emails.send({
       from: 'VeoGrowth <campaigns@veogrowth.com>',
       to: email,
-      subject: `Your B2B Cold Email Campaigns for ${company}`,
-      html: emailHtml,
+      subject: `Your B2B Cold Email Campaigns for ${companyName}`,
+      html: emailHtmlForUser,
       replyTo: 'dmitry@veogrowth.com'
     });
 
@@ -731,6 +534,7 @@ async function sendEmailReport(email, analysis, company) {
     return { success: false, error: error.message };
   }
 }
+
 
 // --- MAIN API ROUTE FUNCTION (POST) ---
 export async function POST(req) {
@@ -754,7 +558,6 @@ export async function POST(req) {
         return Response.json({ success: false, error: 'Research module not configured (API Key or Flash model init issue).' }, { status: 500 });
     }
 
-    // Run research tasks in PARALLEL, ALL using Gemini Flash model
     console.log(`Starting PARALLEL Gemini research for ${website} (ALL TASKS WITH FLASH MODEL)...`);
     const [homepageDataString, caseStudyDataString, marketDataString] = await Promise.all([
       performResearchWithGemini(website, RESEARCH_PROMPTS.homepage),      
@@ -763,116 +566,71 @@ export async function POST(req) {
     ]);
     console.log(`All PARALLEL Gemini research completed for ${website}.`);
 
-    // Combine research results safely
-    const combinedResearch = {
+    const geminiResearchData = {
       homepage: safeJsonParse(homepageDataString, "HomepageAnalysis"),
       caseStudies: safeJsonParse(caseStudyDataString, "CaseStudyAnalysis"),
       marketContext: safeJsonParse(marketDataString, "MarketContextAnalysis"),
-      website: website
     };
 
-    console.log('CLAUDE INPUT (from Gemini research):', JSON.stringify(combinedResearch, null, 2));
+    console.log('GEMINI RESEARCH OUTPUT (to be passed to Claude):', JSON.stringify(geminiResearchData, null, 2));
 
-    // Determine positioning clarity for Claude's prompt
-    const positioningAssessment = positioning === 'yes' ? 'clear' : positioning === 'no' ? 'unclear' : 'moderate';
+    const positioningAssessmentForClaude = positioning === 'yes' ? 'clear' : positioning === 'no' ? 'unclear' : 'moderate';
 
-    // Prepare the prompt for Claude
-    let finalClaudePrompt = METAPROMPT
-      .replace('{research}', JSON.stringify(combinedResearch)) 
+    const claudePromptInput = METAPROMPT
+      .replace('{research}', JSON.stringify(geminiResearchData)) 
       .replace('{website}', website)
-      .replace('{positioning}', positioningAssessment);
+      .replace('{positioning}', positioningAssessmentForClaude);
     
     console.time("ClaudeGeneration");
     const claudeResponse = await anthropic.messages.create({
       model: 'claude-opus-4-20250514',
       max_tokens: 4000,
       temperature: 0.7,
-      messages: [{ role: 'user', content: finalClaudePrompt }]
+      messages: [{ role: 'user', content: claudePromptInput }]
     });
     console.timeEnd("ClaudeGeneration");
-    const analysis = claudeResponse.content[0].text;
+    
+    const claudeOutputText = claudeResponse.content[0].text;
+    console.log("Raw Claude output (first 200 chars):", claudeOutputText.substring(0,200));
+    const claudeAnalysisJson = safeJsonParse(claudeOutputText, "ClaudeAnalysis");
+
+    if (claudeAnalysisJson.error) {
+        console.error("Failed to get valid JSON from Claude. Claude's raw output snippet:", claudeOutputText.substring(0, 500));
+        // Potentially try to re-parse if it's wrapped in markdown, though the prompt asks it not to.
+        const markdownJsonRegex = /```json\s*([\s\S]*?)\s*```/;
+        const match = claudeOutputText.match(markdownJsonRegex);
+        if (match && match[1]) {
+            console.log("Attempting to re-parse Claude output after stripping markdown...");
+            const reparsedClaudeJson = safeJsonParse(match[1].trim(), "ClaudeAnalysisReparsed");
+            if (!reparsedClaudeJson.error) {
+                Object.assign(claudeAnalysisJson, reparsedClaudeJson); // Merge if reparse successful
+                 console.log("Successfully reparsed Claude output after stripping markdown.");
+            } else {
+                 console.error("Reparsing Claude output also failed.");
+                 // Fallback or throw error - for now, we'll proceed with the error object
+            }
+        }
+        if (claudeAnalysisJson.error) { // Check again if still an error after potential reparse
+             return Response.json({ success: false, error: "Failed to parse analysis from Claude.", claude_error_details: claudeAnalysisJson }, { status: 500 });
+        }
+    }
+
 
     const companyNameFromUrl = website.replace(/https?:\/\//, '').replace('www.', '').split('/')[0];
-
-    // Format the response nicely with proper HTML
-    const formattedAnalysis = `
-      <div style="max-width: 800px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-        <h2 style="color: #1f2937; margin-bottom: 32px; font-size: 28px; font-weight: 700;">
-          Campaign Analysis for ${companyNameFromUrl}
-        </h2>
-        <div style="background: #ffffff; padding: 32px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-          ${analysis
-            .replace(/## \*\*Positioning Assessment:/g, '<h3 style="color: #4f46e5; margin: 24px 0 16px 0; font-size: 20px; font-weight: 600;">Positioning Assessment:')
-            .replace(/## \*\*Your ICP appears to be:\*\*/g, '<h3 style="color: #4f46e5; margin: 32px 0 16px 0; font-size: 20px; font-weight: 600;">Your ICP appears to be:</h3>')
-            .replace(/## \*\*Key Personas to Target:\*\*/g, '<h3 style="color: #4f46e5; margin: 32px 0 16px 0; font-size: 20px; font-weight: 600;">Key Personas to Target:</h3>')
-            .replace(/## \*\*Campaign Ideas for.*?:\*\*/g, '<h3 style="color: #4f46e5; margin: 32px 0 16px 0; font-size: 20px; font-weight: 600;">Campaign Ideas:</h3>')
-            .replace(/### \*\*Campaign \d+: "(.*?)"\*\*/g, (match, p1) => `<div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;"><h4 style="color: #1f2937; margin: 0 0 12px 0; font-size: 18px; font-weight: 600;">${p1.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>')}</h4>`)
-            .replace(/\*\*Target\*\*:/g, '<p style="margin: 8px 0;"><strong>Target:</strong>')
-            .replace(/\*\*Example email:\*\*/g, '<p style="margin: 12px 0 0 0;"><strong>Example email:</strong></p><div style="background: white; padding: 16px; border-left: 4px solid #4f46e5; margin: 8px 0; font-style: italic; color: #374151;">')
-            .replace(/(<div style="background: white.*?">)([\s\S]*?)(?=(<\/div>|$|### \*\*Campaign|## \*\*|---|\*\*Want VeoGrowth))/g, (match, p1, p2) => {
-                let emailContent = p2;
-                if (!match.endsWith('</div>')) emailContent += '</div>'; 
-                return p1 + emailContent;
-            })
-            .replace(/### ⚠️ \*\*Note on Social Proof\*\*:/g, (match) => { 
-                let prefix = '</div>'; 
-                const analysisUpToMatch = analysis.substring(0, analysis.indexOf(match));
-                const openCampaignBlock = analysisUpToMatch.lastIndexOf('<div style="background: #f3f4f6');
-                const openEmailBlock = analysisUpToMatch.lastIndexOf('<div style="background: white');
-                if (openCampaignBlock > openEmailBlock && !analysisUpToMatch.substring(openCampaignBlock).includes('</div>')) {
-                     prefix = '</div></div>'; 
-                } else if (openEmailBlock > openCampaignBlock && !analysisUpToMatch.substring(openEmailBlock).includes('</div>')) {
-                    prefix = '</div>';
-                }
-                return prefix + '<div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 16px; border-radius: 8px; margin: 32px 0;"><h4 style="color: #92400e; margin: 0 0 8px 0;">⚠️ Note on Social Proof:</h4>';
-            })
-            .replace(/\*\*Want VeoGrowth to execute these campaigns\?\*\*/g, (match) => { 
-                let prefix = '';
-                const analysisUpToMatch = analysis.substring(0, analysis.indexOf(match));
-                const openSocialProofBlock = analysisUpToMatch.lastIndexOf('<div style="background: #fef3c7');
-                if (openSocialProofBlock !== -1 && !analysisUpToMatch.substring(openSocialProofBlock).includes('</div>')) {
-                    prefix = '</div>';
-                } else {
-                    const openCampaignBlock = analysisUpToMatch.lastIndexOf('<div style="background: #f3f4f6');
-                    const openEmailBlock = analysisUpToMatch.lastIndexOf('<div style="background: white');
-                    if (openCampaignBlock > openEmailBlock && !analysisUpToMatch.substring(openCampaignBlock).includes('</div>')) {
-                         prefix = '</div></div>'; 
-                    } else if (openEmailBlock > openCampaignBlock && !analysisUpToMatch.substring(openEmailBlock).includes('</div>')) {
-                        prefix = '</div>';
-                    }
-                }
-                return prefix + '<h3 style="color: #1f2937; margin: 32px 0 16px 0; font-size: 22px; font-weight: 700; text-align: center;">Want VeoGrowth to execute these campaigns?</h3>';
-            })
-            .replace(/\[Book a Strategy Call →\]/g, '')
-            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-            .replace(/---/g, '<hr style="border: none; border-top: 1px solid #e5e7eb; margin: 32px 0;">')
-            .replace(/- ([^\n]+)/g, (match, p1) => `<li style="margin: 6px 0;">${p1.replace(/&/g, '&').replace(/</g, '<').replace(/>/g, '>')}</li>`)
-            .replace(/(<li.*?<\/li>\n*)+/g, (match) => `<ul style="margin: 12px 0; padding-left: 24px;">${match}</ul>`)
-          }
-        </div>
-        <div style="margin-top: 40px; padding: 32px; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; border-radius: 12px; text-align: center;">
-          <h3 style="margin-bottom: 16px; font-size: 24px; font-weight: 600;">
-            Ready to Execute These Campaigns?
-          </h3>
-          <p style="margin-bottom: 24px; font-size: 18px; opacity: 0.9;">
-            VeoGrowth will implement these campaigns for you: Build targeted lists, craft hyper-personalized messages, and book qualified meetings.
-          </p>
-          <a href="https://calendly.com/veogrowth/strategy" 
-             style="display: inline-block; background: white; color: #4f46e5; padding: 16px 40px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 18px; transition: transform 0.2s;"
-             onmouseover="this.style.transform='translateY(-2px)'"
-             onmouseout="this.style.transform='translateY(0)'">
-            Book a Strategy Call →
-          </a>
-        </div>
-      </div>
-    `;
     
-    await sendEmailReport(email, formattedAnalysis, companyNameFromUrl);
+    // Send email with structured data
+    await sendEmailReport(email, companyNameFromUrl, claudeAnalysisJson, geminiResearchData);
 
+    // Send structured JSON to the frontend
     return Response.json({
       success: true,
-      data: { company: companyNameFromUrl, positioning, analysis: formattedAnalysis }
+      data: { 
+        companyName: companyNameFromUrl, 
+        website: website,
+        positioningInput: positioning, // User's input
+        geminiResearch: geminiResearchData,
+        claudeAnalysis: claudeAnalysisJson
+      }
     });
 
   } catch (error) {
@@ -882,5 +640,5 @@ export async function POST(req) {
 }
 
 export async function GET() {
-  return Response.json({ message: 'VeoGrowth Campaign Generator API - Now with Gemini Powered Research!' });
+  return Response.json({ message: 'VeoGrowth Campaign Generator API - Now with Gemini Powered Research and JSON output!' });
 }
