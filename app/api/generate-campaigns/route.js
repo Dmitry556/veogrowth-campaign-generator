@@ -1,18 +1,19 @@
-// Filename: src/app/api/generate-campaigns/route.js
-// (or pages/api/generate-campaigns.js if using Pages Router)
+// Filename: app/api/generate-campaigns/route.js
 
 export const maxDuration = 60; // Vercel Free Tier timeout
 
 import Anthropic from '@anthropic-ai/sdk';
 import { Resend } from 'resend';
+import fs from 'fs';
+import path from 'path';
 
 // Initialize Anthropic Client
 const anthropicClient = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY, // Ensure ANTHROPIC_API_KEY is set in your Vercel environment variables
+  apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
 // Initialize Resend Client
-const resend = new Resend(process.env.RESEND_API_KEY); // Ensure RESEND_API_KEY is set
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Helper function to safely parse JSON from AI outputs
 function safeJsonParse(jsonString, stepName = "AIOutput") {
@@ -416,10 +417,9 @@ Remember: This tool creates CUTTING-EDGE campaigns that should stun users with t
 FINAL REMINDER: Output ONLY the JSON object. No explanations, no markdown formatting, no additional text. Just the pure JSON.
 \`;
 
-// --- Function to send email with analysis ---
+// --- Function to send email with analysis (Reading from HTML file) ---
 async function sendEmailReport(email, companyName, claudeAnalysisJson) {
   try {
-    // CORRECTED HTML escaping function
     const escapeHtml = (unsafe) => {
         if (typeof unsafe !== 'string') return '';
         return unsafe
@@ -429,125 +429,141 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
              .replace(/"/g, """)
              .replace(/'/g, "'");
     };
+
+    // Path to the email template.
+    // Assumes route.js is in 'app/api/generate-campaigns/'
+    // and email-template.html is ALSO in 'app/api/generate-campaigns/'
+    const templatePath = path.join(process.cwd(), 'app', 'api', 'generate-campaigns', 'email-template.html');
     
-    // Using the same well-structured email template
-const emailHtmlForUser = `
+    // For Next.js 13+ App Router, if your file structure is src/app/api/..., use:
+    // const templatePath = path.join(process.cwd(), 'src', 'app', 'api', 'generate-campaigns', 'email-template.html');
+    // If your file structure is pages/api/..., use:
+    // const templatePath = path.join(process.cwd(), 'pages', 'api', 'generate-campaigns', 'email-template.html');
 
-  <!DOCTYPE html> 
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 700px; margin: 0 auto; padding: 20px; }
-          h1, h2, h3, h4 { color: #1f2937; }
-          h2 { margin-top: 30px; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;}
-          h3 { margin-top: 20px; color: #4f46e5; font-size: 1.25em; }
-          h4 { margin-top: 15px; color: #1f2937; font-size: 1.1em; }
-          .campaign-card { background: #f9fafb; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #e5e7eb;}
-          .email-body { background: #ffffff; padding: 10px; border-left: 3px solid #4f46e5; margin-top: 5px; white-space: pre-line; font-style: italic; font-size: 0.95em; }
-          .note { background: #fef3c7; border-left: 3px solid #f59e0b; padding: 10px; margin-top: 15px; border-radius: 4px; }
-          .pitch-section { background: #4f46e5; color: white; padding: 20px; border-radius: 8px; text-align: center; margin-top:30px; }
-          .pitch-section h2 { color: white; border: none;}
-          .pitch-section a { display: inline-block; background: white; color: #4f46e5; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold; margin-top:15px;}
-          ul { padding-left: 20px; list-style-position: inside; }
-          li { margin-bottom: 5px; }
-        </style>
-      </head>
-      <body>
-        <div style="text-align: center; margin-bottom: 40px;">
-          <h1 style="margin: 0; font-size: 2em;">VeoGrowth</h1>
-          <p style="color: #6b7280; margin-top: 5px;">AI-Powered B2B Lead Generation</p>
-        </div>
 
-        <div style="background: #f3f4f6; padding: 20px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #e5e7eb;">
-          <h2 style="margin-top: 0; border:none; font-size: 1.5em;">Your Campaign Analysis for ${escapeHtml(companyName)}</h2>
-          <p style="color: #4b5563;">Thank you for using VeoGrowth! Here's the AI-generated analysis:</p>
-        </div>
+    let htmlTemplateString;
+    try {
+        htmlTemplateString = fs.readFileSync(templatePath, 'utf-8');
+    } catch (fileError) {
+        console.error(`Error reading email template file at ${templatePath}:`, fileError);
+        return { success: false, error: `Email template file not found or unreadable. Server configuration issue. Path: ${templatePath}` };
+    }
 
-        <div>
-          <h2>Positioning Assessment</h2>
-          <p>${escapeHtml(claudeAnalysisJson.positioningAssessmentOutput) || 'Not available.'}</p>
 
-          <h2>Ideal Customer Profile</h2>
-          <p><strong>Industry:</strong> ${escapeHtml(claudeAnalysisJson.idealCustomerProfile?.industry) || 'N/A'}</p>
-          <p><strong>Company Size:</strong> ${escapeHtml(claudeAnalysisJson.idealCustomerProfile?.companySize) || 'N/A'}</p>
-          <p><strong>Key Characteristics:</strong></p>
-          <ul>${(claudeAnalysisJson.idealCustomerProfile?.keyCharacteristics || []).map(char => `<li>${escapeHtml(char)}</li>`).join('')}</ul>
+    // Replace placeholders
+    let finalHtml = htmlTemplateString.replace(/{{COMPANY_NAME}}/g, escapeHtml(companyName));
+    finalHtml = finalHtml.replace(/{{CURRENT_YEAR}}/g, new Date().getFullYear().toString());
 
-          <h2>Key Personas</h2>
-          ${(claudeAnalysisJson.keyPersonas || []).map(persona => `
-            <div class="campaign-card" style="background:#eef2ff; border-left: 3px solid #6366f1;">
-              <h4>${escapeHtml(persona.title) || 'N/A'}</h4>
-              <p><strong>Pain Points:</strong> ${escapeHtml(persona.painPoints) || 'N/A'}</p>
-            </div>
-          `).join('')}
+    let positioningAssessmentBlock = '';
+    if (claudeAnalysisJson.positioningAssessmentOutput) {
+        if (claudeAnalysisJson.positioningAssessmentOutput.toLowerCase().includes("error")) {
+            positioningAssessmentBlock = `<div class="error-message"><p>${escapeHtml(claudeAnalysisJson.positioningAssessmentOutput)}</p></div>`;
+        } else {
+            positioningAssessmentBlock = `<div><h2>Positioning Assessment</h2><p>${escapeHtml(claudeAnalysisJson.positioningAssessmentOutput)}</p></div>`;
+        }
+    } else {
+        positioningAssessmentBlock = `<div><h2>Positioning Assessment</h2><p>Assessment not available.</p></div>`;
+    }
+    finalHtml = finalHtml.replace('<!-- POSITIONING_ASSESSMENT_BLOCK -->', positioningAssessmentBlock);
 
-          <h2>Campaign Ideas</h2>
-          ${(claudeAnalysisJson.campaignIdeas || []).map(campaign => `
-            <div class="campaign-card">
-              <h3>${escapeHtml(campaign.name) || 'N/A'}</h3>
-              <p><strong>Target:</strong> ${escapeHtml(campaign.target) || 'N/A'}</p>
-              <p><strong>Example Email:</strong></p>
-              <div class="email-body">${(campaign.emailBody || 'N/A').replace(/\\n/g, '<br>')}</div>
-            </div>
-          `).join('')}
+    let icpBlock = '<h2>Ideal Customer Profile</h2><p>Ideal Customer Profile data not available.</p>'; // Added h2 for consistency
+    if (claudeAnalysisJson.idealCustomerProfile) {
+        let characteristicsHtml = '<p>Key characteristics not available.</p>';
+        if (claudeAnalysisJson.idealCustomerProfile.keyCharacteristics && claudeAnalysisJson.idealCustomerProfile.keyCharacteristics.length > 0) {
+            characteristicsHtml = `
+                <p><strong>Key Characteristics:</strong></p>
+                <ul>${claudeAnalysisJson.idealCustomerProfile.keyCharacteristics.map(char => `<li>${escapeHtml(char)}</li>`).join('')}</ul>`;
+        }
+        icpBlock = `
+            <div>
+              <h2>Ideal Customer Profile</h2>
+              <p><strong>Industry:</strong> ${escapeHtml(claudeAnalysisJson.idealCustomerProfile.industry) || 'N/A'}</p>
+              <p><strong>Company Size:</strong> ${escapeHtml(claudeAnalysisJson.idealCustomerProfile.companySize) || 'N/A'}</p>
+              ${characteristicsHtml}
+            </div>`;
+    }
+    finalHtml = finalHtml.replace('<!-- IDEAL_CUSTOMER_PROFILE_BLOCK -->', icpBlock);
+    
+    let personasBlock = '<h2>Key Personas</h2><p>Key personas not available.</p>';
+    if (claudeAnalysisJson.keyPersonas && claudeAnalysisJson.keyPersonas.length > 0) {
+        personasBlock = `
+            <div>
+              <h2>Key Personas</h2>
+              ${claudeAnalysisJson.keyPersonas.map(persona => `
+                <div class="campaign-card" style="background-color:#eef2ff; border-left: 4px solid #6366f1;">
+                  <h4>${escapeHtml(persona.title) || 'N/A'}</h4>
+                  <p><strong>Pain Points:</strong> ${escapeHtml(persona.painPoints) || 'N/A'}</p>
+                </div>`).join('')}
+            </div>`;
+    }
+    finalHtml = finalHtml.replace('<!-- KEY_PERSONAS_BLOCK -->', personasBlock);
 
-          ${(claudeAnalysisJson.socialProofNote && claudeAnalysisJson.socialProofNote.trim() !== "") ? `
+    let campaignsBlock = '<h2>Campaign Ideas</h2><p>Campaign ideas not available.</p>';
+    if (claudeAnalysisJson.campaignIdeas && claudeAnalysisJson.campaignIdeas.length > 0) {
+        campaignsBlock = `
+            <div>
+              <h2>Campaign Ideas</h2>
+              ${claudeAnalysisJson.campaignIdeas.map(campaign => `
+                <div class="campaign-card">
+                  <h3>${escapeHtml(campaign.name) || 'N/A'}</h3>
+                  <p><strong>Target:</strong> ${escapeHtml(campaign.target) || 'N/A'}</p>
+                  <p><strong>Example Email:</strong></p>
+                  <div class="email-body">${(campaign.emailBody || 'N/A').replace(/\\n/g, '<br>')}</div>
+                </div>`).join('')}
+            </div>`;
+    }
+    finalHtml = finalHtml.replace('<!-- CAMPAIGN_IDEAS_BLOCK -->', campaignsBlock);
+
+    let socialProofBlock = '';
+    if (claudeAnalysisJson.socialProofNote && claudeAnalysisJson.socialProofNote.trim() !== "") {
+        socialProofBlock = `
             <div class="note">
               <h4>⚠️ Note on Social Proof</h4>
               <p>${escapeHtml(claudeAnalysisJson.socialProofNote)}</p>
-            </div>
-          ` : ''}
-          
-          <div style="margin-top:30px; padding-top:20px; border-top:1px solid #e5e7eb;">
-            <p><strong>VeoGrowth Pitch:</strong> ${escapeHtml(claudeAnalysisJson.veoGrowthPitch) || ''}</p>
-            <p><em>${escapeHtml(claudeAnalysisJson.prospectTargetingNote) || ''}</em></p>
-          </div>
-        </div>
+            </div>`;
+    }
+    finalHtml = finalHtml.replace('<!-- SOCIAL_PROOF_NOTE_BLOCK -->', socialProofBlock);
 
-        <div class="pitch-section">
-          <h2>Ready to Execute These Campaigns?</h2>
-          <p>VeoGrowth will implement these campaigns for you: Build targeted lists, craft hyper-personalized messages, and book qualified meetings.</p>
-          <a href="https://calendly.com/veogrowth/strategy">Book a Strategy Call</a>
-        </div>
+    finalHtml = finalHtml.replace(/{{VEOGROWTH_PITCH}}/g, escapeHtml(claudeAnalysisJson.veoGrowthPitch || 'VeoGrowth pitch not available.'));
+    finalHtml = finalHtml.replace(/{{PROSPECT_TARGETING_NOTE}}/g, escapeHtml(claudeAnalysisJson.prospectTargetingNote || 'Prospect targeting note not available.'));
 
-        <div style="text-align: center; color: #6b7280; font-size: 14px; margin-top:30px;">
-          <p>Questions? Reply to this email and I'll personally respond.</p>
-          <p style="margin-top: 20px;">
-            Best regards,<br>
-            <strong>Dmitry Pinchuk</strong><br>
-            Founder, VeoGrowth
-          </p>
-        </div>
-      </body>
-      </html>
-    `;
 
     const { data, error } = await resend.emails.send({
-      from: 'VeoGrowth <campaigns@veogrowth.com>', // Make sure this sending address is verified with Resend
+      from: 'VeoGrowth <campaigns@veogrowth.com>',
       to: email,
-      subject: `Your B2B Cold Email Campaigns for ${companyName}`,
-      html: emailHtmlForUser,
-      replyTo: 'dmitry@veogrowth.com' // Your actual reply-to email
+      subject: `Your B2B Campaign Analysis for ${companyName}`,
+      html: finalHtml,
+      replyTo: 'dmitry@veogrowth.com'
     });
 
     if (error) {
-      console.error('Email send error:', error);
-      return { success: false, error };
+      console.error('Resend Email send error:', JSON.stringify(error, null, 2));
+      return { success: false, error: error.message || 'Failed to send email' };
     }
-    console.log('Email sent successfully to:', email, 'Data:', data);
+    console.log('Email sent successfully to:', email, 'Resend ID:', data?.id);
     return { success: true, data };
+
   } catch (error) {
     console.error('Exception in sendEmailReport:', error);
-    return { success: false, error: error.message };
+    let errorMessage = 'An unexpected error occurred while preparing the email';
+    if (error.code === 'ENOENT') {
+        errorMessage = `Email template file not found. Server configuration error.`; // Simplified for user
+        console.error(`Email template file not found. Path was: ${templatePath}`); // Log actual path for debugging
+    } else if (error.message) {
+        errorMessage = error.message;
+    }
+    return { success: false, error: errorMessage };
   }
 }
 
 // --- MAIN API ROUTE FUNCTION (POST) ---
 export async function POST(req) {
+  let companyNameFromUrl = "your company"; // Default for error reporting if URL parsing fails
+  let userEmail = "support@veogrowth.com"; // Default for error reporting
+
   try {
     const { email, website, positioning } = await req.json();
+    userEmail = email; // Set userEmail as soon as it's available
 
     // --- Input Validation ---
     const freeEmailDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com', 'mail.com', 'protonmail.com', 'icloud.com', 'gmx.com', 'zoho.com'];
@@ -559,51 +575,36 @@ export async function POST(req) {
     if (!email || !website || !positioning) {
       return Response.json({ success: false, error: 'Missing required fields: email, website, or positioning.' }, { status: 400 });
     }
-    if (!website.includes('.') || website.length < 4) { // Basic website format check
+    if (!website.includes('.') || website.length < 4) {
         return Response.json({ success: false, error: 'Invalid website format.' }, { status: 400 });
     }
 
-
-    console.log('New lead received:', { email, website, positioning, timestamp: new Date().toISOString() });
+    companyNameFromUrl = website.replace(/https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+    console.log('New lead received:', { email, website, companyName: companyNameFromUrl, positioning, timestamp: new Date().toISOString() });
 
     if (!process.env.ANTHROPIC_API_KEY) {
         console.error("CRITICAL: ANTHROPIC_API_KEY not configured. Aborting AI task.");
+        // No need to send email here, as it's a server config issue before AI call
         return Response.json({ success: false, error: 'AI module not configured on server (API Key missing).' }, { status: 500 });
     }
-    if (!process.env.RESEND_API_KEY) {
-        console.error("CRITICAL: RESEND_API_KEY not configured. Aborting email task.");
-        // We might still want to return AI results to frontend even if email fails later,
-        // but for now, let's ensure basic setup is there.
-    }
     
-    const companyNameFromUrl = website.replace(/https?:\/\//, '').replace(/^www\./, '').split('/')[0];
-
-    // Construct the single comprehensive prompt for Claude
     const populatedPromptForClaude = FINAL_METAPROMPT_FOR_CLAUDE_SONNET
       .replace(/{website}/g, website) 
       .replace(/{company}/g, companyNameFromUrl) 
-      .replace(/{positioning}/g, positioning); // Ensure placeholder matches: {positioning} or {positioning_input}
+      .replace(/{positioning}/g, positioning); 
       
-    console.log(`Starting Claude Sonnet task for ${companyNameFromUrl} (${website}) with web search and thinking enabled...`);
+    console.log(`Starting Claude Sonnet task for ${companyNameFromUrl} (${website})...`);
     console.time("ClaudeFullProcessTime");
 
     const claudeThinkingBudget = 5000; 
-
     const claudeSonnetCallOptions = {
-      model: 'claude-sonnet-4-20250514', // STRICTLY THIS MODEL as requested
-      max_tokens: 20000,                 // As requested
-      temperature: 1.0,                  // As requested
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 20000,
+      temperature: 1.0,
       messages: [{ role: 'user', content: populatedPromptForClaude }],
-      tools: [{ 
-        "type": "web_search_20250305",   // Type for the tool
-        "name": "web_search",            // Name of the tool
-        "max_uses": 1                    // Max uses for the tool
-      }],
-      thinking: { 
-          "type": "enabled",
-          "budget_tokens": claudeThinkingBudget 
-      },
-      betas: ["web-search-2025-03-05"]   // CRITICAL BETA FLAG as requested
+      tools: [{ "type": "web_search_20250305", "name": "web_search", "max_uses": 1 }],
+      thinking: { "type": "enabled", "budget_tokens": claudeThinkingBudget },
+      betas: ["web-search-2025-03-05"]
     };
     
     console.log(`Claude Call Options: Model=${claudeSonnetCallOptions.model}, MaxTokens=${claudeSonnetCallOptions.max_tokens}, Temp=${claudeSonnetCallOptions.temperature}, ThinkingBudget=${claudeSonnetCallOptions.thinking.budget_tokens}, WebSearchMaxUses=${claudeSonnetCallOptions.tools[0].max_uses}, Betas=${JSON.stringify(claudeSonnetCallOptions.betas)}`);
@@ -615,17 +616,15 @@ export async function POST(req) {
     
     if (!claudeOutputText) {
         console.error("Claude Sonnet returned no text output. Full response content:", JSON.stringify(claudeResponse.content, null, 2));
-        // Attempt to send a more informative error email
-        const errorDetail = `AI returned no text output. Response content: ${JSON.stringify(claudeResponse.content, null, 2).substring(0, 1000)}`;
-        await sendEmailReport(email, companyNameFromUrl, { 
+        const errorDetail = `AI returned no text output. This could be a temporary issue with the AI service. Please try again. Response from AI (technical): ${JSON.stringify(claudeResponse.content, null, 2).substring(0, 500)}`;
+        await sendEmailReport(userEmail, companyNameFromUrl, { 
             positioningAssessmentOutput: `Analysis Generation Failed: ${errorDetail}`, 
-            idealCustomerProfile: { industry: "N/A", companySize: "N/A", keyCharacteristics: ["Error in analysis."]}, 
-            keyPersonas: [], campaignIdeas: [],
+            idealCustomerProfile: null, keyPersonas: [], campaignIdeas: [],
             socialProofNote: "Error: Could not generate detailed analysis due to an AI output issue (no text).",
             veoGrowthPitch: "Please try again or contact support if the issue persists.",
             prospectTargetingNote: ""
         });
-        return Response.json({ success: false, error: "AI returned no text output. Check server logs.", debug_info: "No text in response content." }, { status: 500 });
+        return Response.json({ success: false, error: "AI returned no text output. Please try again or check server logs if the issue persists.", debug_info: "No text in response content." }, { status: 500 });
     }
     console.log("Raw Claude Sonnet output (first 300 chars):", claudeOutputText.substring(0,300));
     
@@ -635,12 +634,9 @@ export async function POST(req) {
         console.error("Claude Sonnet did not return valid JSON. Raw output snippet (up to 1000 chars):", claudeOutputText.substring(0, 1000));
         const errorEmailHtml = `<h1>Analysis Generation Failed</h1><p>Our AI generated a response, but we could not parse it as valid JSON. This is a technical issue on our end that we'll investigate. We apologize for the inconvenience.</p><p>Technical Details (for our team): ${finalAnalysisJson.error}</p><p>Raw output snippet (first 2000 chars):</p><pre>${escapeHtml(claudeOutputText.substring(0,2000))}</pre>`;
         
-        // Send a user-friendly error email, but log the technical details
-        await sendEmailReport(email, companyNameFromUrl, { 
-            positioningAssessmentOutput: `We encountered an issue processing the AI's response. Our team has been notified. Please try again in a few minutes. If the problem persists, contact support. Error details: ${finalAnalysisJson.error}`,
-            idealCustomerProfile: { industry: "N/A", companySize: "N/A", keyCharacteristics: ["Error processing AI analysis."]}, 
-            keyPersonas: [], 
-            campaignIdeas: [],
+        await sendEmailReport(userEmail, companyNameFromUrl, { 
+            positioningAssessmentOutput: `We encountered an issue processing the AI's response (Invalid JSON format). Our team has been notified. Please try again in a few minutes. If the problem persists, contact support. Error details: ${finalAnalysisJson.error}`,
+            idealCustomerProfile: null, keyPersonas: [], campaignIdeas: [],
             socialProofNote: `Error: Could not process AI analysis due to an output formatting issue. Details: ${finalAnalysisJson.error}`,
             veoGrowthPitch: "Please try again or contact support if the issue persists.",
             prospectTargetingNote: ""
@@ -649,36 +645,21 @@ export async function POST(req) {
     }
     
     console.log('SUCCESS: Final structured JSON from Claude Sonnet parsed successfully.');
-    // console.log('FINAL STRUCTURED JSON (from Claude Sonnet):', JSON.stringify(finalAnalysisJson, null, 2)); // Potentially very long, log only if debugging specific content
 
-    // Send the successful analysis email
-    const emailResult = await sendEmailReport(email, companyNameFromUrl, finalAnalysisJson);
+    const emailResult = await sendEmailReport(userEmail, companyNameFromUrl, finalAnalysisJson);
     if (!emailResult.success) {
         console.warn("AI analysis generated successfully, but email sending failed.", emailResult.error);
-        // Decide if this is a critical failure for the frontend response.
-        // For now, still return success true with analysis, but add a note.
         return Response.json({
-          success: true, // Still success from AI perspective
+          success: true, 
           message: "Analysis generated, but email sending failed. Please check your inbox or contact support if not received.",
-          data: { 
-            companyName: companyNameFromUrl, 
-            website: website,
-            positioningInput: positioning,
-            analysis: finalAnalysisJson 
-          },
+          data: { companyName: companyNameFromUrl, website: website, positioningInput: positioning, analysis: finalAnalysisJson },
           email_error: emailResult.error
         });
     }
 
-    // Send structured JSON to the frontend
     return Response.json({
       success: true,
-      data: { 
-        companyName: companyNameFromUrl, 
-        website: website,
-        positioningInput: positioning, // The user's input
-        analysis: finalAnalysisJson    // The AI's generated analysis
-      }
+      data: { companyName: companyNameFromUrl, website: website, positioningInput: positioning, analysis: finalAnalysisJson }
     });
 
   } catch (error) {
@@ -687,13 +668,12 @@ export async function POST(req) {
     let errorDetailsForLog = error.message;
 
     if (error.response && error.response.data) { 
-        // Anthropic SDK might wrap API errors differently, check common patterns
         console.error('Anthropic API Error Details:', JSON.stringify(error.response.data, null, 2));
         errorDetailsForLog = JSON.stringify(error.response.data);
         if(error.response.data.error && error.response.data.error.message) {
             errorResponseMessage = `AI Error: ${error.response.data.error.message}`;
         }
-    } else if (error.status && error.message) { // e.g. error from Anthropic SDK client itself
+    } else if (error.status && error.message) { 
         console.error(`API Call Error: Status ${error.status}, Message: ${error.message}`);
         errorDetailsForLog = `Status: ${error.status}, Message: ${error.message}`;
         errorResponseMessage = `AI Service Error: ${error.message}`;
@@ -703,12 +683,9 @@ export async function POST(req) {
         errorDetailsForLog = 'TimeoutError';
     }
     
-    // Attempt to send an error email
-     await sendEmailReport(email || "support@veogrowth.com", // Send to support if user email isn't available
-        companyNameFromUrl || "Unknown Company", { 
+    await sendEmailReport(userEmail, companyNameFromUrl, { 
         positioningAssessmentOutput: `A critical server error occurred during analysis generation: ${errorResponseMessage}. Our team has been notified.`,
-        idealCustomerProfile: { industry: "N/A", companySize: "N/A", keyCharacteristics: ["Critical server error."]}, 
-        keyPersonas: [], campaignIdeas: [],
+        idealCustomerProfile: null, keyPersonas: [], campaignIdeas: [],
         socialProofNote: `Critical Error: ${errorDetailsForLog}`,
         veoGrowthPitch: "We apologize for the inconvenience. Please try again later.",
         prospectTargetingNote: ""
@@ -719,5 +696,5 @@ export async function POST(req) {
 }
 
 export async function GET() {
-  return Response.json({ message: 'VeoGrowth AI Campaign Generator API - Claude Sonnet Powered (Single Call Strategy)' });
+  return Response.json({ message: 'VeoGrowth AI Campaign Generator API - Claude Sonnet Powered (Single Call Strategy with External HTML Template)' });
 }
