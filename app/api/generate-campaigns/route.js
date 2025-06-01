@@ -50,7 +50,7 @@ function safeJsonParse(jsonString, stepName = "AIOutput") {
   }
 }
 
-// The metaprompt - modified for non-web-search version
+// The COMPLETE metaprompt with ALL examples
 const CLAUDE_METAPROMPT = `You are VeoGrowth's elite AI strategist creating world-class B2B cold email campaigns that are so insightful, prospects think "How do they know EXACTLY what I'm dealing with?"
 
 CONTEXT: VeoGrowth is an AI-powered B2B lead generation agency that creates hyper-personalized cold email campaigns. We help companies book qualified meetings by understanding their prospects deeply and crafting messages that resonate at scale.
@@ -59,16 +59,27 @@ INPUTS PROVIDED:
 Company Website: {website}
 Positioning Clear?: {positioning}
 
-YOUR MISSION: Create campaigns that would take a human strategist hours of research to match. Every campaign must demonstrate profound understanding of the prospect's specific situation.
+YOUR MISSION: Create campaigns that would take a human strategist hours of research to match. Every campaign must demonstrate profound understanding of the prospect's specific situation. This is a CUTTING-EDGE tool that should stun users with its quality.
 
-RESEARCH APPROACH:
-Based on your knowledge of {company}, analyze:
-- What they do (specific product/mechanism)
+RESEARCH PHASE:
+Use ONE strategic web search to gather comprehensive intelligence.
+Search query: "{company} product features case studies"
+
+This single search will return multiple pages that you'll read in FULL, including:
+- Their homepage content (product features, positioning, target market)
+- Case studies pages (customer names, specific results)
+- About pages (company size, founding, mission)
+- Blog posts about customers
+- External mentions (reviews, comparisons)
+- Testimonial pages
+
+From these FULL PAGES of content, extract:
+- EXACTLY what they do (not generic - the specific product/mechanism)
 - WHO they serve (specific job titles, company types, industries)
+- Customer company names and quantified results
 - Their unique angle vs competitors
+- Pricing model if mentioned
 - Common use cases and pain points they solve
-
-If you have knowledge of their customer case studies, use them. If not, use the placeholder format specified below.
 
 CRITICAL RULES (NEVER VIOLATE THESE):
 1. NEVER use personal names from testimonials
@@ -85,7 +96,7 @@ CRITICAL RULES (NEVER VIOLATE THESE):
    ❌ "Hi Mark, noticed your company has 200 trucks..."
    ✅ "Hi Mark, [Company] operates 200 trucks across 5 states..."
 
-5. If NO quantified case studies known, use placeholders
+5. If NO quantified case studies found, use placeholders
    Example: "We helped [Your Customer Case Study Here]* achieve [specific result]"
    Then add socialProofNote explaining what's needed
 
@@ -99,11 +110,11 @@ CRITICAL RULES (NEVER VIOLATE THESE):
    ❌ Forced metaphors that don't fit
 
 8. Reference only publicly observable facts
-   ✅ "With 150 developers across 8 countries" (if known)
+   ✅ "With 150 developers across 8 countries" (from job postings)
    ❌ "Your team is probably struggling with..." (assumption)
 
-TARGETING PHILOSOPHY:
-Focus on operational characteristics, not growth signals.
+TARGETING PHILOSOPHY (THIS IS CRUCIAL):
+VeoGrowth needs campaigns that can reach 30,000+ prospects. Focus on operational characteristics, not growth signals.
 
 GOOD Operational Qualifiers:
 - "Logistics companies with 200+ trucks"
@@ -129,7 +140,7 @@ The qualifier must be:
 - Stable (won't change month to month)
 - Creates a large addressable market
 
-Target their ACTUAL customers (who they really sell to), not their aspirational ones.
+Target their ACTUAL customers (who they really sell to), not their aspirational ones (logos on their website).
 
 POSITIONING ASSESSMENT RULES:
 If positioning is CLEAR:
@@ -148,6 +159,22 @@ If positioning is UNCLEAR:
 - Create campaigns for the RECOMMENDED positioning, not their mess
 - Explain why the recommendation would work
 - Use ❌ UNCLEAR
+
+CASE STUDY HANDLING:
+Scenario 1: Found quantified case studies
+- Use exact customer names and metrics
+- "Helped Repak reduce service visits by 70%"
+- No socialProofNote needed
+
+Scenario 2: Found testimonials but no metrics
+- Use customer names with general benefits
+- "Helped Microsoft streamline their process"
+- No socialProofNote needed
+
+Scenario 3: No case studies found
+- Use placeholders in EVERY email
+- "[Your Customer Case Study Here]*"
+- Include detailed socialProofNote
 
 OUTPUT STRUCTURE (JSON ONLY - NO OTHER TEXT):
 {
@@ -199,7 +226,165 @@ OUTPUT STRUCTURE (JSON ONLY - NO OTHER TEXT):
   "prospectTargetingNote": "Note: These campaigns would target approximately [X,000-Y,000] qualified prospects - [description of who they are and why this volume is realistic based on operational qualifiers]."
 }
 
-CRITICAL QUALITY CHECKS:
+COMPLETE QUALITY EXAMPLES:
+
+EXAMPLE 1 - SaaS with Clear Positioning (IXON):
+What we found: Industrial IoT platform for machine builders, clear value props around remote access, case study showing Repak reduced service visits 70%
+
+{
+  "positioningAssessmentOutput": "✅ CLEAR: IXON excellently positions as an Industrial IoT platform specifically for machine builders, with clear value props around secure remote access, machine insights, and service efficiency.",
+  "idealCustomerProfile": {
+    "industry": "Machine Builders, OEMs, Industrial Equipment Manufacturers",
+    "companySize": "50-500 employees",
+    "keyCharacteristics": [
+      "Build complex machines requiring field service",
+      "Have customers across multiple geographic locations",
+      "Service technicians traveling to customer sites",
+      "Machines at customer sites need monitoring/updates",
+      "Pressure to reduce service costs while improving uptime"
+    ]
+  },
+  "keyPersonas": [
+    {
+      "title": "VP of Service",
+      "painPoints": "High travel costs eating 40% of service budget, slow response times to customer issues, technician productivity concerns, customer satisfaction with machine downtime"
+    },
+    {
+      "title": "Service Manager",
+      "painPoints": "Scheduling technician visits efficiently, first-time fix rates below 70%, inability to diagnose issues remotely, managing distributed service teams"
+    },
+    {
+      "title": "Head of Engineering",
+      "painPoints": "Building competitive advantage through digital services, collecting machine performance data, security concerns with remote access, compliance requirements"
+    }
+  ],
+  "campaignIdeas": [
+    {
+      "name": "The Travel Cost Crusher",
+      "target": "VP of Service at machine builders with 10+ field technicians",
+      "emailBody": "Hi Mark, [Company] manufactures packaging equipment installed across North America. With 15 field technicians covering that territory, travel probably eats 40% of your service budget. IXON helped Repak cut on-site visits by 70% through secure remote access. Their technicians fix issues without leaving the office. Worth exploring?"
+    },
+    {
+      "name": "The 3AM Machine Down Crisis",
+      "target": "Service Managers at OEMs with 100+ machines in the field",
+      "emailBody": "Hi Sarah, managing service for 200 CNC machines across 30 customer sites means constant firefighting. When customers call at 3AM about a down machine, blind troubleshooting wastes hours. IXON provides instant remote access to see exactly what's wrong. Repak's first-time fix rate jumped to 85%. Interested?"
+    },
+    {
+      "name": "The Compliance Without Complexity",
+      "target": "CTOs at machine builders selling to automotive/pharma",
+      "emailBody": "Hi David, [Company] supplies assembly systems to pharmaceutical plants. Those facilities demand NIS2 compliance for any remote access. Most VPN solutions create IT nightmares. IXON provides bank-grade security that IT departments actually approve. HoSt implemented without a single audit finding. Want to see how?"
+    }
+  ],
+  "socialProofNote": "",
+  "veoGrowthPitch": "Want VeoGrowth to execute these campaigns? We'll identify 3,000-5,000 machine builders struggling with service costs and craft hyper-personalized messages about their specific equipment and challenges.",
+  "prospectTargetingNote": "Note: These campaigns would target approximately 3,000-5,000 qualified prospects - machine builders and OEMs with 50+ employees who have equipment at customer sites requiring regular service."
+}
+
+EXAMPLE 2 - SaaS with Unclear Positioning (Tourmo):
+What we found: AI fleet management trying to do everything, no clear focus, no quantified case studies
+
+{
+  "positioningAssessmentOutput": "⚠️ MODERATELY CLEAR: Tourmo positions as an AI fleet management platform, but the messaging covers too many features without a clear primary value. The 'no rip and replace' angle is strong but gets lost among 20+ different capabilities.",
+  "idealCustomerProfile": {
+    "industry": "Transportation, Logistics, Delivery, Field Service",
+    "companySize": "50-500 employees",
+    "keyCharacteristics": [
+      "Operating 50-500 commercial vehicles",
+      "Already have telematics but poor adoption/ROI",
+      "Multiple disconnected fleet systems",
+      "Struggling with driver safety scores",
+      "Manual processes eating up manager time"
+    ]
+  },
+  "keyPersonas": [
+    {
+      "title": "Fleet Manager",
+      "painPoints": "Drowning in false positive alerts, spending 10 hours weekly on reports, managing 5+ different systems, no time for actual driver coaching"
+    },
+    {
+      "title": "VP Operations",
+      "painPoints": "Can't prove ROI on $500K fleet tech spend, data in silos across systems, insurance costs rising 20% annually, board questioning technology investments"
+    },
+    {
+      "title": "Safety Director",
+      "painPoints": "80% of alerts are false positives, reactive instead of proactive coaching, insurance premiums increasing, DOT compliance reporting nightmares"
+    }
+  ],
+  "campaignIdeas": [
+    {
+      "name": "The False Positive Eliminator",
+      "target": "Fleet Managers at companies with 100+ vehicles using telematics",
+      "emailBody": "Hi Tom, managing 150 trucks with Samsara cameras means reviewing 50+ false hard-braking alerts daily. That's 10 hours weekly watching videos of coffee cups sliding. Tourmo's AI filters out 89% of false positives. [Your Customer Case Study Here]* freed up 3 managers for actual coaching. Want to stop the alert fatigue?"
+    },
+    {
+      "name": "The Hidden Fuel Theft Detector",
+      "target": "CFOs at trucking companies with 200+ vehicles",
+      "emailBody": "Hi Jessica, tracking fuel across 300 trucks with multiple card providers means ghost transactions hide easily. Most fleets lose 2-3% to fraud they never catch. Tourmo identifies suspicious patterns your cards miss. [Your Customer Case Study Here]* recovered $180K last quarter. Interested in a fuel audit?"
+    },
+    {
+      "name": "The Fleet Tech ROI Rescue",
+      "target": "VP Operations at companies with 3+ fleet management systems",
+      "emailBody": "Hi Robert, running Geotab for tracking, Lytx for cameras, and WEX for fuel means spreadsheet gymnastics. Meanwhile, the board questions why fleet tech costs $500K annually. Tourmo unifies existing systems and proves ROI. [Your Customer Case Study Here]* finally justified their tech spend. Worth a conversation?"
+    }
+  ],
+  "socialProofNote": "We found no specific customer case studies with quantifiable results on your website. When we work together, you'll provide real customer success stories, metrics, and testimonials to strengthen these campaigns.",
+  "veoGrowthPitch": "Want VeoGrowth to execute these campaigns? We'll identify 8,000-12,000 fleet managers already using telematics but struggling to get value, and show them how to maximize their existing investments.",
+  "prospectTargetingNote": "Note: These campaigns would target approximately 8,000-12,000 qualified prospects - logistics and fleet companies with 50-500 vehicles who already have telematics systems but struggle with data overload and poor ROI."
+}
+
+EXAMPLE 3 - Agency Example (Advanced Client):
+What we found: B2B GTM agency with clear case studies (UnlimitedViralIdeas: $192k in 1 month, 43 responses, 13 meetings)
+
+{
+  "positioningAssessmentOutput": "✅ CLEAR: Advanced Client has excellent positioning as a B2B GTM agency that builds predictable outbound systems, with strong proof points and specific revenue metrics.",
+  "idealCustomerProfile": {
+    "industry": "B2B Agencies, SaaS, Professional Services",
+    "companySize": "20-200 employees",
+    "keyCharacteristics": [
+      "Currently $500K-$5M annual revenue",
+      "Relying primarily on referrals and word-of-mouth",
+      "Feast or famine revenue cycles",
+      "Founder still involved in sales",
+      "No systematic outbound process"
+    ]
+  },
+  "keyPersonas": [
+    {
+      "title": "Agency CEO/Founder",
+      "painPoints": "Unpredictable monthly revenue, can't hire sales team due to inconsistency, 100 leads one month then crickets, wearing too many hats"
+    },
+    {
+      "title": "VP Sales",
+      "painPoints": "No predictable pipeline, team doing manual prospecting, inconsistent messaging across reps, can't forecast accurately"
+    },
+    {
+      "title": "Head of Growth",
+      "painPoints": "Referrals drying up, content marketing plateau, paid ads too expensive, need new revenue channel"
+    }
+  ],
+  "campaignIdeas": [
+    {
+      "name": "The Feast or Famine Killer",
+      "target": "Agency CEOs with 20-50 employees",
+      "emailBody": "Hi Michael, running a 30-person agency means some months you're turning away work while others you're scrambling. Advanced Client built UnlimitedViralIdeas a system generating $192K in one month. 43 responses, 13 meetings, 4 closed deals. Want predictable pipeline?"
+    },
+    {
+      "name": "The Referral Dependency Cure",
+      "target": "Founders at B2B service companies doing $1-3M annually",
+      "emailBody": "Hi Sarah, most consultancies at $2M revenue rely 80% on referrals. When those dry up, panic sets in. Advanced Client helped Z Media go from 100 leads one month to zero the next, to 200 consistent responses. Ready to control your growth?"
+    },
+    {
+      "name": "The Sales Team Enabler",
+      "target": "VP Sales at 50-200 person services firms",
+      "emailBody": "Hi David, managing SDRs who spend 70% of time on admin instead of selling? Advanced Client's system freed up dataplor's team to actually do outreach. Their SDR manager says it transformed their productivity. Want your team selling, not spreadsheet wrestling?"
+    }
+  ],
+  "socialProofNote": "",
+  "veoGrowthPitch": "Want VeoGrowth to execute these campaigns? We'll identify 5,000-7,000 B2B service companies trapped in feast-or-famine cycles and show them how to build predictable revenue engines.",
+  "prospectTargetingNote": "Note: These campaigns would target approximately 5,000-7,000 qualified prospects - B2B agencies and service companies with 20-200 employees showing signs of referral dependency and inconsistent pipeline."
+}
+
+CRITICAL QUALITY CHECKS BEFORE SUBMITTING:
 - Count words in each email - are they under 70?
 - Did you avoid "noticed/saw" openings?
 - Are campaign names memorable and specific?
@@ -208,6 +393,8 @@ CRITICAL QUALITY CHECKS:
 - Did you use placeholders if no case studies found?
 - Is the socialProofNote included ONLY when needed?
 - Are all customer names companies, not individuals?
+
+Remember: This tool creates CUTTING-EDGE campaigns that should stun users with their insight and relevance. Every campaign must feel like it required hours of human research to achieve this level of understanding.
 
 FINAL REMINDER: Output ONLY the JSON object. No explanations, no markdown formatting, no additional text. Just the pure JSON.`;
 
@@ -360,21 +547,61 @@ export async function POST(req) {
       .replace(/{company}/g, companyNameFromUrl)
       .replace(/{positioning}/g, positioning);
     
-    console.log(`Starting Claude task for ${website}...`);
+    console.log(`Starting Claude 4 Sonnet task for ${website} with web search...`);
     console.time("ClaudeFullProcess");
 
-    // Call Claude with the stable model
-    const claudeResponse = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
-      max_tokens: 8000,
-      temperature: 0.7,
-      messages: [
-        {
-          role: "user",
-          content: finalPrompt
+    // Call Claude 4 Sonnet with web search
+    let claudeResponse;
+    try {
+      // Using the Python SDK format adapted for JavaScript
+      const messageData = {
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 20000,
+        temperature: 1,
+        messages: [
+          {
+            role: "user",
+            content: finalPrompt
+          }
+        ],
+        tools: [
+          {
+            name: "web_search",
+            type: "web_search_20250305",
+            max_uses: 1
+          }
+        ],
+        thinking: {
+          type: "enabled",
+          budget_tokens: 5000
         }
-      ]
-    });
+      };
+
+      // Add headers for beta features
+      const headers = {
+        'anthropic-beta': 'web-search-2025-03-05',
+        'anthropic-version': '2023-06-01'
+      };
+
+      claudeResponse = await anthropic.messages.create(messageData, { headers });
+      
+    } catch (error) {
+      console.error('Claude 4 API call failed:', error);
+      
+      // Fallback: Try Claude 3.5 Sonnet without web search if Claude 4 fails
+      console.log('Fallback: Trying Claude 3.5 Sonnet without web search...');
+      claudeResponse = await anthropic.messages.create({
+        model: "claude-3-5-sonnet-20241022",
+        max_tokens: 8000,
+        temperature: 0.7,
+        messages: [
+          {
+            role: "user",
+            content: finalPrompt + "\n\nIMPORTANT: Since web search is not available, use your knowledge about the company. If you don't have specific case studies, use the placeholder format '[Your Customer Case Study Here]*' as specified in the instructions."
+          }
+        ]
+      });
+    }
 
     console.timeEnd("ClaudeFullProcess");
 
@@ -446,8 +673,9 @@ export async function POST(req) {
 // GET endpoint for testing
 export async function GET() {
   return Response.json({ 
-    message: 'VeoGrowth Campaign Generator API - Claude Powered', 
+    message: 'VeoGrowth Campaign Generator API - Claude 4 Sonnet Powered', 
     status: 'operational',
-    model: 'claude-3-5-sonnet-20241022'
+    model: 'claude-sonnet-4-20250514',
+    features: ['web_search', 'thinking']
   });
 }
