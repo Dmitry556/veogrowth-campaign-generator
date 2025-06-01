@@ -12,6 +12,7 @@ export default function CampaignGeneratorPage() {
   const [errorDetails, setErrorDetails] = useState('');
   const [analysisData, setAnalysisData] = useState(null);
   const [copiedIndex, setCopiedIndex] = useState(null);
+  const [selectedCampaign, setSelectedCampaign] = useState(0);
 
   const copyToClipboard = (text, index) => {
     navigator.clipboard.writeText(text);
@@ -155,6 +156,25 @@ export default function CampaignGeneratorPage() {
               opacity: 0.7;
             }
           }
+          @keyframes float {
+            0%, 100% {
+              transform: translateY(0px);
+            }
+            50% {
+              transform: translateY(-10px);
+            }
+          }
+          @keyframes glow {
+            0% {
+              box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+            }
+            50% {
+              box-shadow: 0 0 20px rgba(59, 130, 246, 0.8), 0 0 30px rgba(59, 130, 246, 0.6);
+            }
+            100% {
+              box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+            }
+          }
           .animate-slide-in-top {
             animation: slideInFromTop 0.6s ease-out forwards;
           }
@@ -170,6 +190,12 @@ export default function CampaignGeneratorPage() {
           .animate-count-up {
             animation: countUp 0.5s ease-out forwards;
           }
+          .animate-float {
+            animation: float 3s ease-in-out infinite;
+          }
+          .animate-glow {
+            animation: glow 2s ease-in-out infinite;
+          }
           .glass-card {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
@@ -179,6 +205,28 @@ export default function CampaignGeneratorPage() {
             background: rgba(0, 0, 0, 0.2);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.1);
+          }
+          .email-preview {
+            background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+          }
+          .email-preview:hover {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(59, 130, 246, 0.5);
+          }
+          .tab-button {
+            position: relative;
+            transition: all 0.3s ease;
+          }
+          .tab-button.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
           }
         `}} />
 
@@ -340,55 +388,135 @@ export default function CampaignGeneratorPage() {
               </div>
             </div>
 
-            {/* Campaign Ideas */}
+            {/* Enhanced Campaign Ideas with Tabs */}
             <div className="glass-card rounded-2xl p-8 animate-fade-in" style={{ animationDelay: '0.8s' }}>
-              <div className="flex items-center mb-6">
-                <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-blue-600 rounded-lg flex items-center justify-center mr-4">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-blue-600 rounded-lg flex items-center justify-center mr-4">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-2xl font-bold text-white">Campaign Ideas</h3>
                 </div>
-                <h3 className="text-2xl font-bold text-white">Campaign Ideas</h3>
+                <div className="flex items-center space-x-2 text-sm">
+                  <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                  <span className="text-gray-400">Est. ~1 meeting per 400 sends</span>
+                </div>
               </div>
               
+              {/* Tab Navigation */}
+              <div className="flex space-x-1 mb-6 bg-gray-900/50 p-1 rounded-lg">
+                {analysisData.analysis.campaignIdeas.map((campaign, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setSelectedCampaign(index)}
+                    className={`tab-button flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                      selectedCampaign === index 
+                        ? 'bg-blue-600/20 text-blue-400 active' 
+                        : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                    }`}
+                  >
+                    {campaign.name}
+                  </button>
+                ))}
+              </div>
+
+              {/* Email Preview */}
               <div className="space-y-6">
                 {analysisData.analysis.campaignIdeas.map((campaign, index) => (
-                  <div key={index} className="glass-card-dark rounded-xl p-6 border border-blue-500/20 hover:border-blue-500/40 transition-all">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h4 className="text-lg font-semibold text-blue-400">{campaign.name}</h4>
-                        <p className="text-sm text-gray-400 mt-1">
-                          <span className="font-medium">Target:</span> {campaign.target}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => copyToClipboard(campaign.emailBody, index)}
-                        className={`px-4 py-2 rounded-lg transition-all no-print flex items-center space-x-2 ${
-                          copiedIndex === index 
-                            ? 'bg-green-500/20 text-green-400 border border-green-500/40' 
-                            : 'glass-card text-gray-400 hover:text-white hover:border-gray-500/40'
-                        }`}
-                      >
-                        {copiedIndex === index ? (
-                          <>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                            <span className="text-sm">Copied!</span>
-                          </>
-                        ) : (
-                          <>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                            </svg>
-                            <span className="text-sm">Copy</span>
-                          </>
-                        )}
-                      </button>
+                  <div 
+                    key={index} 
+                    className={`transition-all duration-300 ${selectedCampaign === index ? 'block' : 'hidden'}`}
+                  >
+                    {/* Email Header Info */}
+                    <div className="mb-4 text-sm text-gray-400">
+                      <p><span className="font-medium text-gray-300">Target:</span> {campaign.target}</p>
+                      <p className="mt-1"><span className="font-medium text-gray-300">Performance:</span> ~0.25% meeting rate (industry standard)</p>
                     </div>
-                    <div className="bg-gray-900/50 backdrop-blur-sm p-4 rounded-lg border border-gray-700">
-                      <p className="text-sm font-medium text-gray-400 mb-2">Example Email:</p>
-                      <p className="text-gray-300 italic">{campaign.emailBody}</p>
+
+                    {/* Email Preview Card */}
+                    <div className="email-preview rounded-xl overflow-hidden">
+                      {/* Email Header */}
+                      <div className="bg-gray-900/80 border-b border-gray-800 p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                              <span className="text-white font-semibold text-sm">VG</span>
+                            </div>
+                            <div>
+                              <p className="text-white font-medium">VeoGrowth Sales</p>
+                              <p className="text-xs text-gray-400">sales@veogrowth.com</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => copyToClipboard(campaign.emailBody, index)}
+                            className={`px-4 py-2 rounded-lg transition-all flex items-center space-x-2 ${
+                              copiedIndex === index 
+                                ? 'bg-green-500/20 text-green-400 border border-green-500/40 animate-glow' 
+                                : 'glass-card text-gray-400 hover:text-white hover:border-blue-500/40'
+                            }`}
+                          >
+                            {copiedIndex === index ? (
+                              <>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                <span className="text-sm">Copied!</span>
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                                <span className="text-sm">Copy</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center text-sm">
+                            <span className="text-gray-500 w-16">To:</span>
+                            <span className="text-gray-300">[Name]@[company].com</span>
+                          </div>
+                          <div className="flex items-center text-sm">
+                            <span className="text-gray-500 w-16">Subject:</span>
+                            <span className="text-white font-medium">{campaign.name}</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Email Body */}
+                      <div className="p-6">
+                        <p className="text-gray-200 leading-relaxed whitespace-pre-line">
+                          {campaign.emailBody}
+                        </p>
+                        
+                        {/* Email Signature */}
+                        <div className="mt-6 pt-4 border-t border-gray-800">
+                          <p className="text-gray-300 text-sm">Best regards,</p>
+                          <p className="text-gray-300 text-sm font-medium mt-1">[Your Name]</p>
+                          <p className="text-gray-400 text-xs mt-2">VeoGrowth | AI-Powered B2B Lead Generation</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Campaign Metrics */}
+                    <div className="mt-4 grid grid-cols-3 gap-4">
+                      <div className="glass-card-dark rounded-lg p-3 text-center">
+                        <p className="text-2xl font-bold text-green-400">400</p>
+                        <p className="text-xs text-gray-400 mt-1">Emails for 1 Meeting</p>
+                      </div>
+                      <div className="glass-card-dark rounded-lg p-3 text-center">
+                        <p className="text-2xl font-bold text-blue-400">25</p>
+                        <p className="text-xs text-gray-400 mt-1">Meetings from 10K Sends</p>
+                      </div>
+                      <div className="glass-card-dark rounded-lg p-3 text-center">
+                        <p className="text-2xl font-bold text-purple-400">5-7</p>
+                        <p className="text-xs text-gray-400 mt-1">Qualified Opportunities</p>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -457,6 +585,7 @@ export default function CampaignGeneratorPage() {
                 setCopiedIndex(null);
                 setError('');
                 setErrorDetails('');
+                setSelectedCampaign(0);
               }}
               className="inline-flex items-center px-6 py-3 glass-card rounded-lg hover:bg-white/20 text-white font-medium transition-all"
             >
