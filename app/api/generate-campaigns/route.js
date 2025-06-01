@@ -419,6 +419,7 @@ FINAL REMINDER: Output ONLY the JSON object. No explanations, no markdown format
 
 // --- Function to send email with analysis (Reading from HTML file) ---
 async function sendEmailReport(email, companyName, claudeAnalysisJson) {
+  let templatePath; // Declare here to be accessible in catch block for ENOENT
   try {
     const escapeHtml = (unsafe) => {
         if (typeof unsafe !== 'string') return '';
@@ -431,24 +432,24 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
     };
 
     // Path to the email template.
-    // Assumes route.js is in 'app/api/generate-campaigns/'
-    // and email-template.html is ALSO in 'app/api/generate-campaigns/'
-    const templatePath = path.join(process.cwd(), 'app', 'api', 'generate-campaigns', 'email-template.html');
+    // THIS IS THE CORRECT PATH ASSUMING 'route.js' and 'email-template.html'
+    // are both in 'app/api/generate-campaigns/' AND there is NO 'src' folder at the project root for 'app'.
+    templatePath = path.join(process.cwd(), 'app', 'api', 'generate-campaigns', 'email-template.html');
     
-    // For Next.js 13+ App Router, if your file structure is src/app/api/..., use:
-    // const templatePath = path.join(process.cwd(), 'src', 'app', 'api', 'generate-campaigns', 'email-template.html');
-    // If your file structure is pages/api/..., use:
-    // const templatePath = path.join(process.cwd(), 'pages', 'api', 'generate-campaigns', 'email-template.html');
-
+    // --- UNCOMMENT AND USE THIS IF YOUR 'app' FOLDER IS INSIDE 'src' (i.e., src/app/api/...) ---
+    // templatePath = path.join(process.cwd(), 'src', 'app', 'api', 'generate-campaigns', 'email-template.html');
 
     let htmlTemplateString;
     try {
+        console.log(`Attempting to read email template from: ${templatePath}`);
         htmlTemplateString = fs.readFileSync(templatePath, 'utf-8');
+        console.log(`Successfully read email template.`);
     } catch (fileError) {
         console.error(`Error reading email template file at ${templatePath}:`, fileError);
-        return { success: false, error: `Email template file not found or unreadable. Server configuration issue. Path: ${templatePath}` };
+        // This specific error should ideally be caught and handled before sending to Resend,
+        // but Resend itself will also fail if html content is missing/problematic.
+        return { success: false, error: `Email template file not found or unreadable. Server configuration issue. Path attempted: ${templatePath}` };
     }
-
 
     // Replace placeholders
     let finalHtml = htmlTemplateString.replace(/{{COMPANY_NAME}}/g, escapeHtml(companyName));
@@ -456,8 +457,8 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
 
     let positioningAssessmentBlock = '';
     if (claudeAnalysisJson.positioningAssessmentOutput) {
-        if (claudeAnalysisJson.positioningAssessmentOutput.toLowerCase().includes("error")) {
-            positioningAssessmentBlock = `<div class="error-message"><p>${escapeHtml(claudeAnalysisJson.positioningAssessmentOutput)}</p></div>`;
+        if (claudeAnalysisJson.positioningAssessmentOutput.toLowerCase().includes("error") || claudeAnalysisJson.positioningAssessmentOutput.toLowerCase().includes("failed")) {
+            positioningAssessmentBlock = `<div class="error-message"><h4>Issue with Positioning Assessment:</h4><p>${escapeHtml(claudeAnalysisJson.positioningAssessmentOutput)}</p></div>`;
         } else {
             positioningAssessmentBlock = `<div><h2>Positioning Assessment</h2><p>${escapeHtml(claudeAnalysisJson.positioningAssessmentOutput)}</p></div>`;
         }
@@ -466,7 +467,7 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
     }
     finalHtml = finalHtml.replace('<!-- POSITIONING_ASSESSMENT_BLOCK -->', positioningAssessmentBlock);
 
-    let icpBlock = '<h2>Ideal Customer Profile</h2><p>Ideal Customer Profile data not available.</p>'; // Added h2 for consistency
+    let icpBlock = '<h2>Ideal Customer Profile</h2><p>Ideal Customer Profile data not available.</p>';
     if (claudeAnalysisJson.idealCustomerProfile) {
         let characteristicsHtml = '<p>Key characteristics not available.</p>';
         if (claudeAnalysisJson.idealCustomerProfile.keyCharacteristics && claudeAnalysisJson.idealCustomerProfile.keyCharacteristics.length > 0) {
@@ -524,8 +525,8 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
     }
     finalHtml = finalHtml.replace('<!-- SOCIAL_PROOF_NOTE_BLOCK -->', socialProofBlock);
 
-    finalHtml = finalHtml.replace(/{{VEOGROWTH_PITCH}}/g, escapeHtml(claudeAnalysisJson.veoGrowthPitch || 'VeoGrowth pitch not available.'));
-    finalHtml = finalHtml.replace(/{{PROSPECT_TARGETING_NOTE}}/g, escapeHtml(claudeAnalysisJson.prospectTargetingNote || 'Prospect targeting note not available.'));
+    finalHtml = finalHtml.replace(/{{VEOGROWTH_PITCH}}/g, escapeHtml(claudeAnalysisJson.veoGrowthPitch || 'VeoGrowth pitch details were not generated for this analysis.'));
+    finalHtml = finalHtml.replace(/{{PROSPECT_TARGETING_NOTE}}/g, escapeHtml(claudeAnalysisJson.prospectTargetingNote || 'Prospect targeting details were not generated for this analysis.'));
 
 
     const { data, error } = await resend.emails.send({
@@ -546,9 +547,10 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
   } catch (error) {
     console.error('Exception in sendEmailReport:', error);
     let errorMessage = 'An unexpected error occurred while preparing the email';
-    if (error.code === 'ENOENT') {
-        errorMessage = `Email template file not found. Server configuration error.`; // Simplified for user
-        console.error(`Email template file not found. Path was: ${templatePath}`); // Log actual path for debugging
+    // Check if templatePath was defined (meaning fs.readFileSync might have been the issue)
+    if (error.code === 'ENOENT' && templatePath) { 
+        errorMessage = `Email template file not found. Server configuration error.`; 
+        console.error(`Critical: Email template file not found. Path attempted: ${templatePath}`);
     } else if (error.message) {
         errorMessage = error.message;
     }
@@ -558,14 +560,13 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
 
 // --- MAIN API ROUTE FUNCTION (POST) ---
 export async function POST(req) {
-  let companyNameFromUrl = "your company"; // Default for error reporting if URL parsing fails
-  let userEmail = "support@veogrowth.com"; // Default for error reporting
+  let companyNameFromUrl = "your company"; 
+  let userEmailForErrorReporting = "support@veogrowth.com"; 
 
   try {
     const { email, website, positioning } = await req.json();
-    userEmail = email; // Set userEmail as soon as it's available
+    userEmailForErrorReporting = email; 
 
-    // --- Input Validation ---
     const freeEmailDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com', 'mail.com', 'protonmail.com', 'icloud.com', 'gmx.com', 'zoho.com'];
     const emailDomain = email.split('@')[1]?.toLowerCase();
     if (freeEmailDomains.includes(emailDomain)) {
@@ -584,8 +585,11 @@ export async function POST(req) {
 
     if (!process.env.ANTHROPIC_API_KEY) {
         console.error("CRITICAL: ANTHROPIC_API_KEY not configured. Aborting AI task.");
-        // No need to send email here, as it's a server config issue before AI call
         return Response.json({ success: false, error: 'AI module not configured on server (API Key missing).' }, { status: 500 });
+    }
+     if (!process.env.RESEND_API_KEY) {
+        console.error("CRITICAL: RESEND_API_KEY not configured. Email sending will fail.");
+        // Decide if this is a fatal error or just a warning. For now, let AI proceed.
     }
     
     const populatedPromptForClaude = FINAL_METAPROMPT_FOR_CLAUDE_SONNET
@@ -617,7 +621,7 @@ export async function POST(req) {
     if (!claudeOutputText) {
         console.error("Claude Sonnet returned no text output. Full response content:", JSON.stringify(claudeResponse.content, null, 2));
         const errorDetail = `AI returned no text output. This could be a temporary issue with the AI service. Please try again. Response from AI (technical): ${JSON.stringify(claudeResponse.content, null, 2).substring(0, 500)}`;
-        await sendEmailReport(userEmail, companyNameFromUrl, { 
+        await sendEmailReport(userEmailForErrorReporting, companyNameFromUrl, { 
             positioningAssessmentOutput: `Analysis Generation Failed: ${errorDetail}`, 
             idealCustomerProfile: null, keyPersonas: [], campaignIdeas: [],
             socialProofNote: "Error: Could not generate detailed analysis due to an AI output issue (no text).",
@@ -632,10 +636,10 @@ export async function POST(req) {
 
     if (finalAnalysisJson.error) {
         console.error("Claude Sonnet did not return valid JSON. Raw output snippet (up to 1000 chars):", claudeOutputText.substring(0, 1000));
-        const errorEmailHtml = `<h1>Analysis Generation Failed</h1><p>Our AI generated a response, but we could not parse it as valid JSON. This is a technical issue on our end that we'll investigate. We apologize for the inconvenience.</p><p>Technical Details (for our team): ${finalAnalysisJson.error}</p><p>Raw output snippet (first 2000 chars):</p><pre>${escapeHtml(claudeOutputText.substring(0,2000))}</pre>`;
+        const errorDescription = `Our AI generated a response, but we could not parse it as valid JSON (Error: ${finalAnalysisJson.error}). This is a technical issue on our end that we'll investigate. We apologize for the inconvenience.`;
         
-        await sendEmailReport(userEmail, companyNameFromUrl, { 
-            positioningAssessmentOutput: `We encountered an issue processing the AI's response (Invalid JSON format). Our team has been notified. Please try again in a few minutes. If the problem persists, contact support. Error details: ${finalAnalysisJson.error}`,
+        await sendEmailReport(userEmailForErrorReporting, companyNameFromUrl, { 
+            positioningAssessmentOutput: errorDescription,
             idealCustomerProfile: null, keyPersonas: [], campaignIdeas: [],
             socialProofNote: `Error: Could not process AI analysis due to an output formatting issue. Details: ${finalAnalysisJson.error}`,
             veoGrowthPitch: "Please try again or contact support if the issue persists.",
@@ -646,12 +650,12 @@ export async function POST(req) {
     
     console.log('SUCCESS: Final structured JSON from Claude Sonnet parsed successfully.');
 
-    const emailResult = await sendEmailReport(userEmail, companyNameFromUrl, finalAnalysisJson);
+    const emailResult = await sendEmailReport(userEmailForErrorReporting, companyNameFromUrl, finalAnalysisJson);
     if (!emailResult.success) {
         console.warn("AI analysis generated successfully, but email sending failed.", emailResult.error);
         return Response.json({
           success: true, 
-          message: "Analysis generated, but email sending failed. Please check your inbox or contact support if not received.",
+          message: `Analysis generated, but email sending failed: ${emailResult.error}. Please check your inbox or contact support if not received.`,
           data: { companyName: companyNameFromUrl, website: website, positioningInput: positioning, analysis: finalAnalysisJson },
           email_error: emailResult.error
         });
@@ -665,7 +669,7 @@ export async function POST(req) {
   } catch (error) {
     console.error('FATAL API Error in POST function:', error);
     let errorResponseMessage = 'Failed to generate analysis due to a server error. Please try again.';
-    let errorDetailsForLog = error.message;
+    let errorDetailsForLog = error.message || "Unknown error structure";
 
     if (error.response && error.response.data) { 
         console.error('Anthropic API Error Details:', JSON.stringify(error.response.data, null, 2));
@@ -680,16 +684,21 @@ export async function POST(req) {
     } else if (error.name === 'TimeoutError') {
         console.error('API call timed out:', error.message);
         errorResponseMessage = 'The request to our AI service timed out. This can happen during peak load. Please try again in a moment.';
-        errorDetailsForLog = 'TimeoutError';
+        errorDetailsForLog = 'TimeoutError - The AI took too long to respond.';
     }
     
-    await sendEmailReport(userEmail, companyNameFromUrl, { 
-        positioningAssessmentOutput: `A critical server error occurred during analysis generation: ${errorResponseMessage}. Our team has been notified.`,
-        idealCustomerProfile: null, keyPersonas: [], campaignIdeas: [],
-        socialProofNote: `Critical Error: ${errorDetailsForLog}`,
-        veoGrowthPitch: "We apologize for the inconvenience. Please try again later.",
-        prospectTargetingNote: ""
-    });
+    // Attempt to send an error email only if we have an email address for the user
+    if (userEmailForErrorReporting && userEmailForErrorReporting !== "support@veogrowth.com") {
+        await sendEmailReport(userEmailForErrorReporting, companyNameFromUrl, { 
+            positioningAssessmentOutput: `A critical server error occurred during analysis generation: ${errorResponseMessage}. Our team has been notified.`,
+            idealCustomerProfile: null, keyPersonas: [], campaignIdeas: [],
+            socialProofNote: `Critical Error (for our team): ${errorDetailsForLog}`,
+            veoGrowthPitch: "We apologize for the inconvenience. Please try again later or contact support.",
+            prospectTargetingNote: ""
+        });
+    } else {
+        console.error("Could not send error email to user as email address was not available or was default support address.");
+    }
 
     return Response.json({ success: false, error: errorResponseMessage, debug_details: errorDetailsForLog }, { status: 500 });
   }
