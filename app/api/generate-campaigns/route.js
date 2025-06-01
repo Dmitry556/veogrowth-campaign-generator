@@ -4,14 +4,14 @@ export const maxDuration = 60;
 
 import Anthropic from '@anthropic-ai/sdk';
 import { Resend } from 'resend';
-import fs from 'node:fs'; // Explicitly using node:fs
-import path from 'node:path'; // Explicitly using node:path
+import fs from 'node:fs';
+import path from 'node:path';
 
 const anthropicClient = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-const resendClient = new Resend(process.env.RESEND_API_KEY); // Renamed to avoid conflict with Resend class
+const resendClient = new Resend(process.env.RESEND_API_KEY);
 
 function safeJsonParse(jsonString, stepName = "AIOutput") {
   if (typeof jsonString !== 'string' || !jsonString.trim()) {
@@ -414,10 +414,13 @@ FINAL REMINDER: Output ONLY the JSON object. No explanations, no markdown format
 \`;
 
 async function sendEmailReport(email, companyName, claudeAnalysisJson) {
-  let templatePath = ''; // Define outside try for access in catch
+  const templateFilePath = path.join(process.cwd(), 'app', 'api', 'generate-campaigns', 'email-template.html');
+  // For 'src/app/...' structure, use:
+  // const templateFilePath = path.join(process.cwd(), 'src', 'app', 'api', 'generate-campaigns', 'email-template.html');
+
   try {
     const escapeHtml = (unsafe) => {
-      if (typeof unsafe !== 'string') return '';
+      if (typeof unsafe !== 'string') { return ''; }
       return unsafe
         .replace(/&/g, "&")
         .replace(/</g, "<")
@@ -426,27 +429,15 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
         .replace(/'/g, "'");
     };
 
-    // Assuming 'route.js' and 'email-template.html' are in 'app/api/generate-campaigns/'
-    // AND there is NO 'src' folder at the project root for 'app'.
-    templatePath = path.join(process.cwd(), 'app', 'api', 'generate-campaigns', 'email-template.html');
+    console.log("Attempting to read email template from: " + templateFilePath);
+    const htmlTemplateString = fs.readFileSync(templateFilePath, 'utf-8');
+    console.log("Successfully read email template.");
 
-    let htmlTemplateString;
-    try {
-      console.log("Reading email template from: " + templatePath);
-      htmlTemplateString = fs.readFileSync(templatePath, 'utf-8');
-      console.log("Successfully read email template.");
-    } catch (fileError) {
-      console.error("ERROR reading email template file at " + templatePath + ": " + fileError.message);
-      return { success: false, error: "Email template file error. Server configuration issue." };
-    }
+    let finalHtml = htmlTemplateString;
 
-    let finalHtml = htmlTemplateString; // Start with the raw template
-
-    // COMPANY_NAME and CURRENT_YEAR
     finalHtml = finalHtml.replace(/\{\{COMPANY_NAME\}\}/g, escapeHtml(companyName));
     finalHtml = finalHtml.replace(/\{\{CURRENT_YEAR\}\}/g, new Date().getFullYear().toString());
 
-    // POSITIONING_ASSESSMENT_BLOCK
     let positioningBlock = '';
     if (claudeAnalysisJson.positioningAssessmentOutput) {
       if (claudeAnalysisJson.positioningAssessmentOutput.toLowerCase().includes("error") || claudeAnalysisJson.positioningAssessmentOutput.toLowerCase().includes("failed")) {
@@ -459,7 +450,6 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
     }
     finalHtml = finalHtml.replace('<!-- POSITIONING_ASSESSMENT_BLOCK -->', positioningBlock);
 
-    // IDEAL_CUSTOMER_PROFILE_BLOCK
     let icpBlock = '<h2>Ideal Customer Profile</h2><p>Ideal Customer Profile data not available.</p>';
     if (claudeAnalysisJson.idealCustomerProfile) {
       let characteristicsHtml = '<p>Key characteristics not available.</p>';
@@ -477,7 +467,6 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
     }
     finalHtml = finalHtml.replace('<!-- IDEAL_CUSTOMER_PROFILE_BLOCK -->', icpBlock);
 
-    // KEY_PERSONAS_BLOCK
     let personasBlock = '<h2>Key Personas</h2><p>Key personas not available.</p>';
     if (claudeAnalysisJson.keyPersonas && claudeAnalysisJson.keyPersonas.length > 0) {
       let personaCards = '';
@@ -492,7 +481,6 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
     }
     finalHtml = finalHtml.replace('<!-- KEY_PERSONAS_BLOCK -->', personasBlock);
 
-    // CAMPAIGN_IDEAS_BLOCK
     let campaignsBlock = '<h2>Campaign Ideas</h2><p>Campaign ideas not available.</p>';
     if (claudeAnalysisJson.campaignIdeas && claudeAnalysisJson.campaignIdeas.length > 0) {
       let campaignCards = '';
@@ -509,18 +497,16 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
     }
     finalHtml = finalHtml.replace('<!-- CAMPAIGN_IDEAS_BLOCK -->', campaignsBlock);
     
-    // SOCIAL_PROOF_NOTE_BLOCK
     let socialProofBlock = '';
     if (claudeAnalysisJson.socialProofNote && claudeAnalysisJson.socialProofNote.trim() !== "") {
       socialProofBlock = "<div class=\"note\"><h4>⚠️ Note on Social Proof</h4><p>" + escapeHtml(claudeAnalysisJson.socialProofNote) + "</p></div>";
     }
     finalHtml = finalHtml.replace('<!-- SOCIAL_PROOF_NOTE_BLOCK -->', socialProofBlock);
 
-    // VEOGROWTH_PITCH and PROSPECT_TARGETING_NOTE
     finalHtml = finalHtml.replace(/\{\{VEOGROWTH_PITCH\}\}/g, escapeHtml(claudeAnalysisJson.veoGrowthPitch || 'VeoGrowth pitch details were not generated.'));
     finalHtml = finalHtml.replace(/\{\{PROSPECT_TARGETING_NOTE\}\}/g, escapeHtml(claudeAnalysisJson.prospectTargetingNote || 'Prospect targeting details were not generated.'));
 
-    const { data, error } = await resendClient.emails.send({ // Use resendClient
+    const { data, error } = await resendClient.emails.send({
       from: 'VeoGrowth <campaigns@veogrowth.com>',
       to: email,
       subject: "Your B2B Campaign Analysis for " + companyName,
@@ -535,12 +521,12 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
     console.log("Email sent successfully to: " + email + ", Resend ID: " + (data ? data.id : 'N/A'));
     return { success: true, data };
 
-  } catch (e) { // Changed error variable to 'e' to avoid conflict
-    console.error("Exception in sendEmailReport: " + e.message);
+  } catch (e) {
+    console.error("Exception in sendEmailReport: " + e.message, e.stack); // Added e.stack for more details
     let errorMessage = "An unexpected error occurred while preparing the email";
-    if (e.code === 'ENOENT' && templatePath) {
-      errorMessage = "Email template file not found. Server configuration error.";
-      console.error("Critical: Email template file not found. Path attempted: " + templatePath);
+    if (e.code === 'ENOENT') { // Check specific error for file not found
+      errorMessage = "Email template file not found. Server configuration error. Path attempted: " + templateFilePath;
+      console.error("Critical: Email template file not found. Path was: " + templateFilePath);
     }
     return { success: false, error: errorMessage };
   }
@@ -597,7 +583,7 @@ export async function POST(req) {
       betas: ["web-search-2025-03-05"]
     };
 
-    console.log("Claude Call Options: Model=" + claudeSonnetCallOptions.model + ", MaxTokens=" + claudeSonnetCallOptions.max_tokens); // Simplified log
+    console.log("Claude Call Options: Model=" + claudeSonnetCallOptions.model + ", MaxTokens=" + claudeSonnetCallOptions.max_tokens);
 
     const claudeResponse = await anthropicClient.messages.create(claudeSonnetCallOptions);
     console.timeEnd("ClaudeFullProcessTime");
@@ -649,7 +635,7 @@ export async function POST(req) {
       data: { companyName: companyNameFromUrl, website: website, positioningInput: positioning, analysis: finalAnalysisJson }
     });
 
-  } catch (error) { // Changed to 'error' to match naming convention
+  } catch (error) {
     console.error("FATAL API Error in POST function: " + error.message, error.stack);
     let errorResponseMessage = "Failed to generate analysis due to a server error. Please try again.";
     let errorDetailsForLog = error.message || "Unknown error structure";
@@ -681,8 +667,9 @@ export async function POST(req) {
 
     return Response.json({ success: false, error: errorResponseMessage, debug_details: errorDetailsForLog }, { status: 500 });
   }
-}
+} // THIS IS THE CLOSING BRACE FOR THE POST FUNCTION
 
 export async function GET() {
   return Response.json({ message: 'VeoGrowth API - Claude Sonnet (External HTML Template)' });
-}
+} // THIS IS THE CLOSING BRACE FOR THE GET FUNCTION
+// NO CODE AFTER THIS LINE
