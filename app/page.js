@@ -28,6 +28,25 @@ export default function CampaignGeneratorPage() {
       return;
     }
 
+    // Normalize website URL
+    let normalizedWebsite = website.trim();
+    
+    // Remove trailing slash
+    normalizedWebsite = normalizedWebsite.replace(/\/$/, '');
+    
+    // Add https:// if no protocol is specified
+    if (!normalizedWebsite.match(/^https?:\/\//i)) {
+      normalizedWebsite = 'https://' + normalizedWebsite;
+    }
+    
+    // Basic URL validation
+    try {
+      new URL(normalizedWebsite);
+    } catch (err) {
+      setError('Please enter a valid website URL');
+      return;
+    }
+
     // Check for work email
     const freeEmailDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com'];
     const emailDomain = email.split('@')[1]?.toLowerCase();
@@ -44,7 +63,11 @@ export default function CampaignGeneratorPage() {
       const response = await fetch('/api/generate-campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, website, positioning })
+        body: JSON.stringify({ 
+          email, 
+          website: normalizedWebsite, 
+          positioning 
+        })
       });
 
       const data = await response.json();
@@ -412,13 +435,14 @@ export default function CampaignGeneratorPage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Company Website
+                      <span className="text-xs text-gray-500 ml-2 font-normal">(any format accepted)</span>
                     </label>
                     <div className="relative">
                       <input
-                        type="url"
+                        type="text"
                         value={website}
                         onChange={(e) => setWebsite(e.target.value)}
-                        placeholder="https://yourcompany.com"
+                        placeholder="apple.com or https://apple.com"
                         required
                         className="w-full px-4 py-3 pl-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                       />
