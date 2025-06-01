@@ -419,25 +419,35 @@ FINAL REMINDER: Output ONLY the JSON object. No explanations, no markdown format
 // --- Function to send email with analysis ---
 async function sendEmailReport(email, companyName, claudeAnalysisJson) {
   try {
-    // CORRECTED HTML escaping function
+    // ALTERNATIVE AND ROBUST HTML escaping function - jasdhasdh#22
     const escapeHtml = (unsafe) => {
-        if (typeof unsafe !== 'string') return '';
-        return unsafe
-             .replace(/&/g, "&")
-             .replace(/</g, "<")
-             .replace(/>/g, ">")
-             .replace(/"/g, """)
-             .replace(/'/g, "'");
+      if (typeof unsafe !== 'string') return '';
+      return unsafe.replace(/[&<>"']/g, function (match) {
+        switch (match) {
+          case '&':
+            return '&';
+          case '<':
+            return '<';
+          case '>':
+            return '>';
+          case '"':
+            return '"';
+          case "'":
+            return '''; // HTML entity for single quote
+          default:
+            return match;
+        }
+      });
     };
     
-    // Using string concatenation for email HTML
+    // Using string concatenation for email HTML (as per previous correct version)
     let emailHtmlForUser = '<!DOCTYPE html>\n';
     emailHtmlForUser += '<html>\n';
     emailHtmlForUser += '<head>\n';
     emailHtmlForUser += '  <meta charset="utf-8">\n';
     emailHtmlForUser += '  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n';
     emailHtmlForUser += '  <style>\n';
-    emailHtmlForUser += "    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 700px; margin: 0 auto; padding: 20px; }\n"; // Note: Switched to double quotes for the outer string here to easily use single quotes inside
+    emailHtmlForUser += "    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 700px; margin: 0 auto; padding: 20px; }\n";
     emailHtmlForUser += '    h1, h2, h3, h4 { color: #1f2937; }\n';
     emailHtmlForUser += '    h2 { margin-top: 30px; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;}\n';
     emailHtmlForUser += '    h3 { margin-top: 20px; color: #4f46e5; font-size: 1.25em; }\n';
@@ -460,7 +470,7 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
     emailHtmlForUser += '\n';
     emailHtmlForUser += '  <div style="background: #f3f4f6; padding: 20px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #e5e7eb;">\n';
     emailHtmlForUser += `    <h2 style="margin-top: 0; border:none; font-size: 1.5em;">Your Campaign Analysis for ${escapeHtml(companyName)}</h2>\n`;
-    emailHtmlForUser += '    <p style="color: #4b5563;">Thank you for using VeoGrowth! Here\'s the AI-generated analysis:</p>\n'; // Escaped single quote in "Here's"
+    emailHtmlForUser += '    <p style="color: #4b5563;">Thank you for using VeoGrowth! Here\'s the AI-generated analysis:</p>\n';
     emailHtmlForUser += '  </div>\n';
     emailHtmlForUser += '\n';
     emailHtmlForUser += '  <div>\n';
@@ -511,7 +521,7 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
     emailHtmlForUser += '  </div>\n';
     emailHtmlForUser += '\n';
     emailHtmlForUser += '  <div style="text-align: center; color: #6b7280; font-size: 14px; margin-top:30px;">\n';
-    emailHtmlForUser += '    <p>Questions? Reply to this email and I\'ll personally respond.</p>\n'; // Escaped single quote
+    emailHtmlForUser += '    <p>Questions? Reply to this email and I\'ll personally respond.</p>\n';
     emailHtmlForUser += '    <p style="margin-top: 20px;">\n';
     emailHtmlForUser += '      Best regards,<br>\n';
     emailHtmlForUser += '      <strong>Dmitry Pinchuk</strong><br>\n';
