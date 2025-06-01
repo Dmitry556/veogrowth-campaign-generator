@@ -13,6 +13,93 @@ const anthropic = new Anthropic({
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+// Simple in-memory cache for email verifications (resets on each deployment)
+const emailVerificationCache = new Map();
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+// LeadMagic Email Verification
+async function verifyEmailWithLeadMagic(email) {
+  // Check cache first
+  const cached = emailVerificationCache.get(email);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    console.log('Using cached verification for:', email);
+    return cached.result;
+  }
+
+  // Skip verification if no API key (for testing)
+  if (!process.env.LEADMAGIC_API_KEY) {
+    console.log('LeadMagic API key not configured, skipping verification');
+    return { isValid: true, status: 'skipped' };
+  }
+
+  try {
+    const response = await fetch('https://api.leadmagic.io/email-validate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': process.env.LEADMAGIC_API_KEY
+      },
+      body: JSON.stringify({ email })
+    });
+
+    if (!response.ok) {
+      console.error('LeadMagic API error:', response.status);
+      // If LeadMagic is down, allow the email through
+      return { isValid: true, status: 'api_error' };
+    }
+
+    const data = await response.json();
+    console.log('LeadMagic verification result:', data);
+
+    // Only accept 'valid' and 'valid_catch_all' statuses
+    const validStatuses = ['valid', 'valid_catch_all'];
+    const isValid = validStatuses.includes(data.status || data.result);
+
+    const result = {
+      isValid,
+      status: data.status || data.result,
+      company: data.company || null,
+      message: getVerificationMessage(data.status || data.result)
+    };
+
+    // Cache the result
+    emailVerificationCache.set(email, {
+      result,
+      timestamp: Date.now()
+    });
+
+    // Clean up old cache entries if cache gets too large
+    if (emailVerificationCache.size > 1000) {
+      const entriesToDelete = [];
+      for (const [key, value] of emailVerificationCache.entries()) {
+        if (Date.now() - value.timestamp > CACHE_DURATION) {
+          entriesToDelete.push(key);
+        }
+      }
+      entriesToDelete.forEach(key => emailVerificationCache.delete(key));
+    }
+
+    return result;
+  } catch (error) {
+    console.error('LeadMagic verification error:', error);
+    // If verification fails, allow the email through
+    return { isValid: true, status: 'error' };
+  }
+}
+
+function getVerificationMessage(status) {
+  const messages = {
+    'valid': 'Email verified successfully',
+    'valid_catch_all': 'Email verified (catch-all domain)',
+    'catch_all': 'This domain accepts all emails - high bounce risk',
+    'unknown': 'Unable to verify this email address',
+    'invalid': 'This email address does not exist',
+    'api_error': 'Verification service temporarily unavailable',
+    'error': 'Verification failed - proceeding anyway'
+  };
+  return messages[status] || 'Unknown verification status';
+}
+
 // Helper function to safely escape HTML
 function escapeHtml(unsafe) {
   if (typeof unsafe !== 'string') return '';
@@ -536,6 +623,22 @@ export async function POST(req) {
 
     console.log('New lead:', { email, website, positioning, timestamp: new Date() });
 
+    // Verify email with LeadMagic
+    console.log('Verifying email with LeadMagic...');
+    const verificationResult = await verifyEmailWithLeadMagic(email);
+    
+    if (!verificationResult.isValid) {
+      console.log('Email verification failed:', verificationResult);
+      return Response.json({ 
+        success: false, 
+        error: 'Invalid email address', 
+        details: verificationResult.message,
+        verificationStatus: verificationResult.status
+      }, { status: 400 });
+    }
+
+    console.log('Email verified successfully:', verificationResult.status);
+
     if (!process.env.ANTHROPIC_API_KEY) {
       console.error("Critical: ANTHROPIC_API_KEY not configured. Aborting.");
       return Response.json({ success: false, error: 'AI module not configured (API Key missing).' }, { status: 500 });
@@ -734,7 +837,11 @@ export async function POST(req) {
         companyName: companyNameFromUrl, 
         website: website,
         positioningInput: positioning,
-        analysis: finalAnalysisJson 
+        analysis: finalAnalysisJson,
+        emailVerification: {
+          status: verificationResult.status,
+          company: verificationResult.company
+        }
       }
     });
 
