@@ -4,18 +4,16 @@ import Anthropic from '@anthropic-ai/sdk';
 import { Resend } from 'resend';
 
 // Initialize API clients
-const anthropicClient = new Anthropic({
+const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Helper function to safely escape HTML - this was causing issues before
+// Helper function to safely escape HTML
 function escapeHtml(unsafe) {
-  // First check if the input is a string
   if (typeof unsafe !== 'string') return '';
   
-  // Replace dangerous characters with HTML entities
   return unsafe
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -24,9 +22,8 @@ function escapeHtml(unsafe) {
     .replace(/'/g, "&#039;");
 }
 
-// Safe JSON parser that handles markdown wrappers and other formatting issues
+// Safe JSON parser
 function safeJsonParse(jsonString, stepName = "AIOutput") {
-  // Check if input is valid
   if (typeof jsonString !== 'string' || !jsonString.trim()) {
     console.warn(`safeJsonParse for ${stepName}: Input is not a non-empty string.`);
     return { error: `Input for ${stepName} was not a non-empty string.` };
@@ -53,7 +50,7 @@ function safeJsonParse(jsonString, stepName = "AIOutput") {
   }
 }
 
-// The complete metaprompt for Claude
+// The metaprompt - modified for non-web-search version
 const CLAUDE_METAPROMPT = `You are VeoGrowth's elite AI strategist creating world-class B2B cold email campaigns that are so insightful, prospects think "How do they know EXACTLY what I'm dealing with?"
 
 CONTEXT: VeoGrowth is an AI-powered B2B lead generation agency that creates hyper-personalized cold email campaigns. We help companies book qualified meetings by understanding their prospects deeply and crafting messages that resonate at scale.
@@ -64,25 +61,14 @@ Positioning Clear?: {positioning}
 
 YOUR MISSION: Create campaigns that would take a human strategist hours of research to match. Every campaign must demonstrate profound understanding of the prospect's specific situation.
 
-RESEARCH PHASE:
-Use ONE strategic web search to gather comprehensive intelligence.
-Search query: "{company} product features case studies"
-
-This single search will return multiple pages that you'll read in FULL, including:
-- Their homepage content (product features, positioning, target market)
-- Case studies pages (customer names, specific results)
-- About pages (company size, founding, mission)
-- Blog posts about customers
-- External mentions (reviews, comparisons)
-- Testimonial pages
-
-From these FULL PAGES of content, extract:
-- EXACTLY what they do (not generic - the specific product/mechanism)
+RESEARCH APPROACH:
+Based on your knowledge of {company}, analyze:
+- What they do (specific product/mechanism)
 - WHO they serve (specific job titles, company types, industries)
-- Customer company names and quantified results
 - Their unique angle vs competitors
-- Pricing model if mentioned
 - Common use cases and pain points they solve
+
+If you have knowledge of their customer case studies, use them. If not, use the placeholder format specified below.
 
 CRITICAL RULES (NEVER VIOLATE THESE):
 1. NEVER use personal names from testimonials
@@ -99,7 +85,7 @@ CRITICAL RULES (NEVER VIOLATE THESE):
    ❌ "Hi Mark, noticed your company has 200 trucks..."
    ✅ "Hi Mark, [Company] operates 200 trucks across 5 states..."
 
-5. If NO quantified case studies found, use placeholders
+5. If NO quantified case studies known, use placeholders
    Example: "We helped [Your Customer Case Study Here]* achieve [specific result]"
    Then add socialProofNote explaining what's needed
 
@@ -113,7 +99,7 @@ CRITICAL RULES (NEVER VIOLATE THESE):
    ❌ Forced metaphors that don't fit
 
 8. Reference only publicly observable facts
-   ✅ "With 150 developers across 8 countries" (from job postings)
+   ✅ "With 150 developers across 8 countries" (if known)
    ❌ "Your team is probably struggling with..." (assumption)
 
 TARGETING PHILOSOPHY:
@@ -143,7 +129,7 @@ The qualifier must be:
 - Stable (won't change month to month)
 - Creates a large addressable market
 
-Target their ACTUAL customers (who they really sell to), not their aspirational ones (logos on their website).
+Target their ACTUAL customers (who they really sell to), not their aspirational ones.
 
 POSITIONING ASSESSMENT RULES:
 If positioning is CLEAR:
@@ -162,22 +148,6 @@ If positioning is UNCLEAR:
 - Create campaigns for the RECOMMENDED positioning, not their mess
 - Explain why the recommendation would work
 - Use ❌ UNCLEAR
-
-CASE STUDY HANDLING:
-Scenario 1: Found quantified case studies
-- Use exact customer names and metrics
-- "Helped Repak reduce service visits by 70%"
-- No socialProofNote needed
-
-Scenario 2: Found testimonials but no metrics
-- Use customer names with general benefits
-- "Helped Microsoft streamline their process"
-- No socialProofNote needed
-
-Scenario 3: No case studies found
-- Use placeholders in EVERY email
-- "[Your Customer Case Study Here]*"
-- Include detailed socialProofNote
 
 OUTPUT STRUCTURE (JSON ONLY - NO OTHER TEXT):
 {
@@ -229,8 +199,6 @@ OUTPUT STRUCTURE (JSON ONLY - NO OTHER TEXT):
   "prospectTargetingNote": "Note: These campaigns would target approximately [X,000-Y,000] qualified prospects - [description of who they are and why this volume is realistic based on operational qualifiers]."
 }
 
-QUALITY EXAMPLES: [Include full examples from the metaprompt document]
-
 CRITICAL QUALITY CHECKS:
 - Count words in each email - are they under 70?
 - Did you avoid "noticed/saw" openings?
@@ -246,7 +214,6 @@ FINAL REMINDER: Output ONLY the JSON object. No explanations, no markdown format
 // Function to send email with the analysis results
 async function sendEmailReport(email, companyName, claudeAnalysisJson) {
   try {
-    // Build the email HTML using the escapeHtml function
     const emailHtmlForUser = `
 <!DOCTYPE html>
 <html>
@@ -338,7 +305,6 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
 </body>
 </html>`;
 
-    // Send the email using Resend
     const { data, error } = await resend.emails.send({
       from: 'VeoGrowth <campaigns@veogrowth.com>',
       to: email,
@@ -364,7 +330,6 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
 // Main API route handler
 export async function POST(req) {
   try {
-    // Parse the request body
     const { email, website, positioning } = await req.json();
     
     // Validate inputs
@@ -381,7 +346,6 @@ export async function POST(req) {
 
     console.log('New lead:', { email, website, positioning, timestamp: new Date() });
 
-    // Check if API key is configured
     if (!process.env.ANTHROPIC_API_KEY) {
       console.error("Critical: ANTHROPIC_API_KEY not configured. Aborting.");
       return Response.json({ success: false, error: 'AI module not configured (API Key missing).' }, { status: 500 });
@@ -390,43 +354,26 @@ export async function POST(req) {
     // Extract company name from URL
     const companyNameFromUrl = website.replace(/https?:\/\//, '').replace('www.', '').split('/')[0];
 
-    // Prepare the prompt by replacing placeholders
+    // Prepare the prompt
     const finalPrompt = CLAUDE_METAPROMPT
       .replace(/{website}/g, website)
       .replace(/{company}/g, companyNameFromUrl)
       .replace(/{positioning}/g, positioning);
     
-    console.log(`Starting Claude Sonnet 4 task for ${website} with web search...`);
+    console.log(`Starting Claude task for ${website}...`);
     console.time("ClaudeFullProcess");
 
-    // Call Claude using the exact format specified by the user
-    const claudeResponse = await anthropicClient.beta.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 20000,
-      temperature: 1,
+    // Call Claude with the stable model
+    const claudeResponse = await anthropic.messages.create({
+      model: "claude-3-5-sonnet-20241022",
+      max_tokens: 8000,
+      temperature: 0.7,
       messages: [
         {
           role: "user",
-          content: [
-            {
-              type: "text",
-              text: finalPrompt
-            }
-          ]
+          content: finalPrompt
         }
-      ],
-      tools: [
-        {
-          name: "web_search",
-          type: "web_search_20250305",
-          max_uses: 1
-        }
-      ],
-      thinking: {
-        type: "enabled",
-        budget_tokens: 5000
-      },
-      betas: ["web-search-2025-03-05"]
+      ]
     });
 
     console.timeEnd("ClaudeFullProcess");
@@ -483,7 +430,6 @@ export async function POST(req) {
   } catch (error) {
     console.error('API Error in POST function:', error);
     
-    // Log detailed error information
     if (error.response?.data) {
       console.error('Anthropic API Error Details:', JSON.stringify(error.response.data, null, 2));
     } else if (error.status && error.message) {
@@ -500,7 +446,8 @@ export async function POST(req) {
 // GET endpoint for testing
 export async function GET() {
   return Response.json({ 
-    message: 'VeoGrowth Campaign Generator API - Claude Sonnet 4 Powered', 
-    status: 'operational' 
+    message: 'VeoGrowth Campaign Generator API - Claude Powered', 
+    status: 'operational',
+    model: 'claude-3-5-sonnet-20241022'
   });
 }
