@@ -109,6 +109,20 @@ export default function CampaignGeneratorPage() {
         </div>
 
         <div className="relative max-w-4xl mx-auto px-4 py-16">
+          {/* VeoGrowth branding at top */}
+          <div className="text-center mb-8">
+            <span 
+              className="text-3xl text-gray-900" 
+              style={{ 
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                fontWeight: '300',
+                letterSpacing: '-0.03em'
+              }}
+            >
+              VeoGrowth
+            </span>
+          </div>
+
           {/* Success Header */}
           <div className="text-center mb-12">
             <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-6">
@@ -127,7 +141,7 @@ export default function CampaignGeneratorPage() {
                 <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                Email verified with LeadMagic
+                Email verified by VeoGrowth Intelligence
                 {analysisData.emailVerification.company && (
                   <span className="ml-1">• {analysisData.emailVerification.company}</span>
                 )}
@@ -374,12 +388,16 @@ export default function CampaignGeneratorPage() {
         <header className="pt-8 pb-4 px-4">
           <div className="max-w-6xl mx-auto flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
-              <span className="text-2xl font-bold text-gray-900">VeoGrowth</span>
+              <span 
+                className="text-3xl text-gray-900" 
+                style={{ 
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  fontWeight: '300',
+                  letterSpacing: '-0.03em'
+                }}
+              >
+                VeoGrowth
+              </span>
             </div>
             <span className="text-sm text-gray-500">AI-Powered B2B Lead Generation</span>
           </div>
@@ -394,7 +412,7 @@ export default function CampaignGeneratorPage() {
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                 </svg>
-                Powered by Claude 4 Sonnet with Web Search
+                Powered by Claude + VeoGrowth's email intelligence layer
               </div>
               
               <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
@@ -554,7 +572,7 @@ export default function CampaignGeneratorPage() {
                     <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    Email Verified
+                    Email Intelligence Active
                   </span>
                   <span className="flex items-center">
                     <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -576,7 +594,7 @@ export default function CampaignGeneratorPage() {
 
         {/* Footer */}
         <footer className="py-8 px-4 text-center text-sm text-gray-500">
-          <p>© 2025 VeoGrowth. Powered by AI and years of B2B lead generation expertise.</p>
+          <p>© 2025 VeoGrowth. Powered by Claude + VeoGrowth's email intelligence layer.</p>
         </footer>
       </div>
     </div>
