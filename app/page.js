@@ -272,60 +272,60 @@ export default function CampaignGeneratorPage() {
             </div>
           </div>
 
-          {/* Hero Insight Section */}
+          {/* Hero Insight Section - Better Readability */}
           <div className="mb-8 animate-slide-in-top" style={{ animationDelay: '0.1s' }}>
-            <div className="glass-card rounded-2xl p-8 text-center border-2 border-blue-400/30">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-500/20 rounded-full mb-6">
-                <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="glass-card rounded-2xl p-10 text-center border-2 border-blue-400/30">
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-blue-500/20 rounded-full mb-6 shadow-lg">
+                <svg className="w-10 h-10 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <h2 className="text-3xl font-bold text-white mb-2">
+              <h2 className="text-4xl font-bold text-white mb-3">
                 {analysisData.analysis.positioningAssessmentOutput.split(':')[0]}
               </h2>
-              <p className="text-lg text-gray-300 max-w-2xl mx-auto">
+              <p className="text-xl text-gray-100 max-w-3xl mx-auto leading-relaxed">
                 {analysisData.analysis.positioningAssessmentOutput.split(':')[1]?.trim() || ''}
               </p>
-              <div className="mt-6 inline-flex items-center space-x-2 text-sm">
-                <span className="text-gray-400">Confidence:</span>
+              <div className="mt-8 inline-flex items-center space-x-3 text-base">
+                <span className="text-gray-300 font-medium">Confidence:</span>
                 <div className="flex items-center">
-                  <div className="w-32 h-2 bg-gray-700 rounded-full overflow-hidden">
+                  <div className="w-40 h-3 bg-gray-700 rounded-full overflow-hidden">
                     <div className="h-full bg-gradient-to-r from-blue-500 to-green-500 rounded-full" style={{ width: '94%' }}></div>
                   </div>
-                  <span className="ml-2 text-white font-medium">94%</span>
+                  <span className="ml-3 text-white font-bold text-lg">94%</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Quick Summary Stats - Animated */}
+          {/* Quick Summary Stats - Better Contrast */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <div className="glass-card p-6 rounded-xl text-center animate-slide-in-left" style={{ animationDelay: '0.2s' }}>
-              <div className="text-3xl font-bold text-blue-400 animate-count-up">3</div>
-              <div className="text-sm text-gray-300 mt-1">Campaign Ideas</div>
+              <div className="text-4xl font-bold text-blue-400 animate-count-up">3</div>
+              <div className="text-base text-white mt-2">Campaign Ideas</div>
             </div>
             <div className="glass-card p-6 rounded-xl text-center animate-slide-in-left" style={{ animationDelay: '0.3s' }}>
-              <div className="text-3xl font-bold text-purple-400 animate-count-up">3</div>
-              <div className="text-sm text-gray-300 mt-1">Key Personas</div>
+              <div className="text-4xl font-bold text-purple-400 animate-count-up">3</div>
+              <div className="text-base text-white mt-2">Key Personas</div>
             </div>
             <div className="glass-card p-6 rounded-xl text-center animate-slide-in-right" style={{ animationDelay: '0.4s' }}>
-              <div className="text-3xl font-bold text-green-400 animate-count-up">
+              <div className="text-4xl font-bold text-green-400 animate-count-up">
                 {analysisData.analysis.prospectTargetingNote?.match(/(\d+,\d+)/)?.[0] || '10,000+'}
               </div>
-              <div className="text-sm text-gray-300 mt-1">Target Prospects</div>
+              <div className="text-base text-white mt-2">Target Prospects</div>
             </div>
             <div className="glass-card p-6 rounded-xl text-center animate-slide-in-right" style={{ animationDelay: '0.5s' }}>
-              <div className="text-3xl font-bold animate-count-up">
+              <div className="text-4xl font-bold animate-count-up">
                 {analysisData.analysis.positioningAssessmentOutput.startsWith('✅') ? '✅' : 
                  analysisData.analysis.positioningAssessmentOutput.startsWith('⚠️') ? '⚠️' : '❌'}
               </div>
-              <div className="text-sm text-gray-300 mt-1">Positioning</div>
+              <div className="text-base text-white mt-2">Positioning</div>
             </div>
           </div>
 
           {/* Full Analysis - Redesigned */}
           <div className="space-y-6 mb-8">
-            {/* Ideal Customer Profile */}
+            {/* Ideal Customer Profile - Improved Design */}
             <div className="glass-card rounded-2xl p-8 animate-fade-in" style={{ animationDelay: '0.6s' }}>
               <div className="flex items-center mb-6">
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-indigo-600 rounded-lg flex items-center justify-center mr-4">
@@ -337,30 +337,30 @@ export default function CampaignGeneratorPage() {
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="glass-card-dark rounded-lg p-4">
-                  <span className="text-xs text-blue-400 uppercase tracking-wide font-semibold">Industry</span>
-                  <p className="text-white mt-1 font-medium">{analysisData.analysis.idealCustomerProfile.industry}</p>
+                <div className="bg-blue-500/10 border border-blue-400/30 rounded-xl p-5">
+                  <span className="text-sm text-blue-400 uppercase tracking-wide font-bold block mb-2">Industry Focus</span>
+                  <p className="text-white text-lg font-medium">{analysisData.analysis.idealCustomerProfile.industry}</p>
                 </div>
-                <div className="glass-card-dark rounded-lg p-4">
-                  <span className="text-xs text-purple-400 uppercase tracking-wide font-semibold">Company Size</span>
-                  <p className="text-white mt-1 font-medium">{analysisData.analysis.idealCustomerProfile.companySize}</p>
+                <div className="bg-purple-500/10 border border-purple-400/30 rounded-xl p-5">
+                  <span className="text-sm text-purple-400 uppercase tracking-wide font-bold block mb-2">Company Size</span>
+                  <p className="text-white text-lg font-medium">{analysisData.analysis.idealCustomerProfile.companySize}</p>
                 </div>
               </div>
               
               <div className="mt-6">
-                <span className="text-xs text-green-400 uppercase tracking-wide font-semibold">Key Characteristics</span>
-                <div className="mt-3 space-y-2">
+                <span className="text-sm text-green-400 uppercase tracking-wide font-bold block mb-4">Key Characteristics</span>
+                <div className="space-y-3">
                   {analysisData.analysis.idealCustomerProfile.keyCharacteristics.map((char, index) => (
-                    <div key={index} className="flex items-start">
-                      <div className="w-1.5 h-1.5 bg-green-400 rounded-full mt-1.5 mr-3 flex-shrink-0"></div>
-                      <span className="text-gray-300">{char}</span>
+                    <div key={index} className="flex items-start bg-gray-800/30 rounded-lg p-3 border border-gray-700/50">
+                      <div className="w-2 h-2 bg-green-400 rounded-full mt-1.5 mr-3 flex-shrink-0"></div>
+                      <span className="text-white text-base leading-relaxed">{char}</span>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
 
-            {/* Key Personas */}
+            {/* Key Personas - Better Contrast */}
             <div className="glass-card rounded-2xl p-8 animate-fade-in" style={{ animationDelay: '0.7s' }}>
               <div className="flex items-center mb-6">
                 <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-600 rounded-lg flex items-center justify-center mr-4">
@@ -373,15 +373,16 @@ export default function CampaignGeneratorPage() {
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {analysisData.analysis.keyPersonas.map((persona, index) => (
-                  <div key={index} className="glass-card-dark rounded-xl p-6 border border-purple-500/20 hover:border-purple-500/40 transition-all transform hover:scale-105 cursor-pointer">
-                    <div className="w-16 h-16 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-full flex items-center justify-center mb-4 mx-auto">
-                      <svg className="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div key={index} className="bg-purple-500/10 border border-purple-400/30 rounded-xl p-6 hover:bg-purple-500/20 transition-all transform hover:scale-105 cursor-pointer">
+                    <div className="w-16 h-16 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center mb-4 mx-auto shadow-lg">
+                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
                     </div>
-                    <h4 className="font-semibold text-white text-center mb-3">{persona.title}</h4>
-                    <p className="text-sm text-gray-400 text-center">
-                      <span className="text-purple-400 font-medium">Pain Points:</span> {persona.painPoints}
+                    <h4 className="font-bold text-white text-lg text-center mb-3">{persona.title}</h4>
+                    <p className="text-base text-white text-center leading-relaxed">
+                      <span className="text-purple-300 font-semibold block mb-2">Pain Points:</span> 
+                      <span className="text-gray-100">{persona.painPoints}</span>
                     </p>
                   </div>
                 ))}
@@ -407,16 +408,16 @@ export default function CampaignGeneratorPage() {
                 </div>
               </div>
               
-              {/* Tab Navigation */}
-              <div className="flex space-x-1 mb-6 bg-gray-900/50 p-1 rounded-lg">
+              {/* Tab Navigation - Better Contrast */}
+              <div className="flex space-x-2 mb-8 bg-gray-900/70 backdrop-blur p-2 rounded-xl">
                 {analysisData.analysis.campaignIdeas.map((campaign, index) => (
                   <button
                     key={index}
                     onClick={() => setSelectedCampaign(index)}
-                    className={`tab-button flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                    className={`tab-button flex-1 px-6 py-3 rounded-lg text-base font-semibold transition-all ${
                       selectedCampaign === index 
-                        ? 'bg-blue-600/20 text-blue-400 active' 
-                        : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                        ? 'bg-blue-600 text-white shadow-lg active' 
+                        : 'text-gray-300 hover:text-white hover:bg-gray-800'
                     }`}
                   >
                     {campaign.name}
@@ -424,7 +425,7 @@ export default function CampaignGeneratorPage() {
                 ))}
               </div>
 
-              {/* Email Preview */}
+              {/* Email Preview - Narrower and Better Contrast */}
               <div className="space-y-6">
                 {analysisData.analysis.campaignIdeas.map((campaign, index) => (
                   <div 
@@ -432,90 +433,92 @@ export default function CampaignGeneratorPage() {
                     className={`transition-all duration-300 ${selectedCampaign === index ? 'block' : 'hidden'}`}
                   >
                     {/* Email Header Info */}
-                    <div className="mb-4 text-sm text-gray-400">
-                      <p><span className="font-medium text-gray-300">Target:</span> {campaign.target}</p>
-                      <p className="mt-1"><span className="font-medium text-gray-300">Performance:</span> ~0.25% meeting rate (industry standard)</p>
+                    <div className="mb-4 text-base">
+                      <p className="text-white"><span className="font-semibold text-gray-300">Target:</span> {campaign.target}</p>
+                      <p className="mt-1 text-white"><span className="font-semibold text-gray-300">Performance:</span> ~0.25% meeting rate (industry standard)</p>
                     </div>
 
-                    {/* Email Preview Card */}
-                    <div className="email-preview rounded-xl overflow-hidden">
-                      {/* Email Header */}
-                      <div className="bg-gray-900/80 border-b border-gray-800 p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                              <span className="text-white font-semibold text-sm">VG</span>
+                    {/* Email Preview Card - Narrower */}
+                    <div className="max-w-2xl mx-auto">
+                      <div className="email-preview rounded-xl overflow-hidden shadow-2xl">
+                        {/* Email Header */}
+                        <div className="bg-gray-900 border-b border-gray-700 p-5">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                                <span className="text-white font-bold text-lg">VG</span>
+                              </div>
+                              <div>
+                                <p className="text-white font-semibold text-lg">VeoGrowth Sales</p>
+                                <p className="text-sm text-gray-300">sales@veogrowth.com</p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="text-white font-medium">VeoGrowth Sales</p>
-                              <p className="text-xs text-gray-400">sales@veogrowth.com</p>
+                            <button
+                              onClick={() => copyToClipboard(campaign.emailBody, index)}
+                              className={`px-5 py-2.5 rounded-lg transition-all flex items-center space-x-2 ${
+                                copiedIndex === index 
+                                  ? 'bg-green-500/20 text-green-400 border border-green-500/40 animate-glow' 
+                                  : 'glass-card text-white hover:text-blue-400 hover:border-blue-500/40'
+                              }`}
+                            >
+                              {copiedIndex === index ? (
+                                <>
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  <span className="font-medium">Copied!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                  </svg>
+                                  <span className="font-medium">Copy</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex items-center text-base">
+                              <span className="text-gray-400 w-20">To:</span>
+                              <span className="text-white">[Name]@[company].com</span>
+                            </div>
+                            <div className="flex items-center text-base">
+                              <span className="text-gray-400 w-20">Subject:</span>
+                              <span className="text-white font-semibold">{campaign.name}</span>
                             </div>
                           </div>
-                          <button
-                            onClick={() => copyToClipboard(campaign.emailBody, index)}
-                            className={`px-4 py-2 rounded-lg transition-all flex items-center space-x-2 ${
-                              copiedIndex === index 
-                                ? 'bg-green-500/20 text-green-400 border border-green-500/40 animate-glow' 
-                                : 'glass-card text-gray-400 hover:text-white hover:border-blue-500/40'
-                            }`}
-                          >
-                            {copiedIndex === index ? (
-                              <>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                                <span className="text-sm">Copied!</span>
-                              </>
-                            ) : (
-                              <>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                </svg>
-                                <span className="text-sm">Copy</span>
-                              </>
-                            )}
-                          </button>
                         </div>
-                        <div className="space-y-1">
-                          <div className="flex items-center text-sm">
-                            <span className="text-gray-500 w-16">To:</span>
-                            <span className="text-gray-300">[Name]@[company].com</span>
-                          </div>
-                          <div className="flex items-center text-sm">
-                            <span className="text-gray-500 w-16">Subject:</span>
-                            <span className="text-white font-medium">{campaign.name}</span>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Email Body */}
-                      <div className="p-6">
-                        <p className="text-gray-200 leading-relaxed whitespace-pre-line">
-                          {campaign.emailBody}
-                        </p>
                         
-                        {/* Email Signature */}
-                        <div className="mt-6 pt-4 border-t border-gray-800">
-                          <p className="text-gray-300 text-sm">Best regards,</p>
-                          <p className="text-gray-300 text-sm font-medium mt-1">[Your Name]</p>
-                          <p className="text-gray-400 text-xs mt-2">VeoGrowth | AI-Powered B2B Lead Generation</p>
+                        {/* Email Body */}
+                        <div className="p-6 bg-gray-950/90">
+                          <p className="text-white text-lg leading-relaxed whitespace-pre-line">
+                            {campaign.emailBody}
+                          </p>
+                          
+                          {/* Email Signature */}
+                          <div className="mt-8 pt-6 border-t border-gray-800">
+                            <p className="text-white text-base">Best regards,</p>
+                            <p className="text-white text-base font-semibold mt-1">[Your Name]</p>
+                            <p className="text-gray-300 text-sm mt-3">VeoGrowth | AI-Powered B2B Lead Generation</p>
+                          </div>
                         </div>
                       </div>
                     </div>
 
                     {/* Campaign Metrics */}
-                    <div className="mt-4 grid grid-cols-3 gap-4">
-                      <div className="glass-card-dark rounded-lg p-3 text-center">
-                        <p className="text-2xl font-bold text-green-400">400</p>
-                        <p className="text-xs text-gray-400 mt-1">Emails for 1 Meeting</p>
+                    <div className="max-w-2xl mx-auto mt-6 grid grid-cols-3 gap-4">
+                      <div className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-xl p-4 text-center">
+                        <p className="text-3xl font-bold text-green-400">400</p>
+                        <p className="text-sm text-white mt-2">Emails for 1 Meeting</p>
                       </div>
-                      <div className="glass-card-dark rounded-lg p-3 text-center">
-                        <p className="text-2xl font-bold text-blue-400">25</p>
-                        <p className="text-xs text-gray-400 mt-1">Meetings from 10K Sends</p>
+                      <div className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-xl p-4 text-center">
+                        <p className="text-3xl font-bold text-blue-400">25</p>
+                        <p className="text-sm text-white mt-2">Meetings from 10K Sends</p>
                       </div>
-                      <div className="glass-card-dark rounded-lg p-3 text-center">
-                        <p className="text-2xl font-bold text-purple-400">5-7</p>
-                        <p className="text-xs text-gray-400 mt-1">Qualified Opportunities</p>
+                      <div className="bg-gray-800/50 backdrop-blur border border-gray-700 rounded-xl p-4 text-center">
+                        <p className="text-3xl font-bold text-purple-400">5-7</p>
+                        <p className="text-sm text-white mt-2">Qualified Opportunities</p>
                       </div>
                     </div>
                   </div>
@@ -523,25 +526,25 @@ export default function CampaignGeneratorPage() {
               </div>
             </div>
 
-            {/* Social Proof Note */}
+            {/* Social Proof Note - Better Contrast */}
             {analysisData.analysis.socialProofNote && analysisData.analysis.socialProofNote.trim() !== "" && (
-              <div className="glass-card rounded-2xl p-6 animate-fade-in border border-yellow-500/30" style={{ animationDelay: '0.9s' }}>
+              <div className="bg-yellow-500/10 border border-yellow-400/40 rounded-2xl p-6 animate-fade-in" style={{ animationDelay: '0.9s' }}>
                 <div className="flex">
-                  <svg className="w-5 h-5 text-yellow-500 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-6 h-6 text-yellow-400 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                   </svg>
-                  <p className="text-sm text-yellow-300">{analysisData.analysis.socialProofNote}</p>
+                  <p className="text-base text-white leading-relaxed">{analysisData.analysis.socialProofNote}</p>
                 </div>
               </div>
             )}
             
-            {/* Prospect Targeting Note */}
+            {/* Prospect Targeting Note - Better Contrast */}
             <div className="glass-card rounded-2xl p-8 animate-fade-in" style={{ animationDelay: '1s' }}>
               <div className="space-y-4">
-                <p className="text-white">
-                  <span className="font-semibold text-blue-400">VeoGrowth Pitch:</span> {analysisData.analysis.veoGrowthPitch}
+                <p className="text-lg text-white leading-relaxed">
+                  <span className="font-bold text-blue-400">VeoGrowth Pitch:</span> {analysisData.analysis.veoGrowthPitch}
                 </p>
-                <p className="text-gray-300 text-sm italic">
+                <p className="text-base text-gray-100 italic leading-relaxed">
                   {analysisData.analysis.prospectTargetingNote}
                 </p>
               </div>
