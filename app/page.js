@@ -99,7 +99,7 @@ export default function CampaignGeneratorPage() {
             <p className="text-xl text-gray-600 mb-2">
               Your AI-powered campaign analysis has been sent to <span className="font-semibold text-gray-900">{email}</span>
             </p>
-            {analysisData.emailVerification && analysisData.emailVerification.status === 'valid' && (
+            {analysisData.emailVerification && ['valid', 'valid_catch_all', 'catch_all'].includes(analysisData.emailVerification.status) && (
               <p className="text-sm text-green-600 flex items-center justify-center mb-2">
                 <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
