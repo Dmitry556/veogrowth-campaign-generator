@@ -431,8 +431,9 @@ async function sendEmailReport(email, companyName, claudeAnalysisJson) {
     };
     
     // Using the same well-structured email template
-    const emailHtmlForUser = `
-      <!DOCTYPE html>
+const emailHtmlForUser = `
+
+  <!DOCTYPE html> 
       <html>
       <head>
         <meta charset="utf-8">
