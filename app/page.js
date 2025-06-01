@@ -9,6 +9,7 @@ export default function CampaignGeneratorPage() {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+  const [errorDetails, setErrorDetails] = useState('');
   const [analysisData, setAnalysisData] = useState(null);
   const [copiedIndex, setCopiedIndex] = useState(null);
 
@@ -37,6 +38,7 @@ export default function CampaignGeneratorPage() {
 
     setLoading(true);
     setError('');
+    setErrorDetails('');
 
     try {
       const response = await fetch('/api/generate-campaigns', {
@@ -52,6 +54,7 @@ export default function CampaignGeneratorPage() {
         setAnalysisData(data.data);
       } else {
         setError(data.error || 'Something went wrong. Please try again.');
+        setErrorDetails(data.details || '');
       }
     } catch (err) {
       setError('Network error. Please try again.');
@@ -96,6 +99,17 @@ export default function CampaignGeneratorPage() {
             <p className="text-xl text-gray-600 mb-2">
               Your AI-powered campaign analysis has been sent to <span className="font-semibold text-gray-900">{email}</span>
             </p>
+            {analysisData.emailVerification && analysisData.emailVerification.status === 'valid' && (
+              <p className="text-sm text-green-600 flex items-center justify-center mb-2">
+                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Email verified with LeadMagic
+                {analysisData.emailVerification.company && (
+                  <span className="ml-1">• {analysisData.emailVerification.company}</span>
+                )}
+              </p>
+            )}
             <p className="text-lg text-gray-500">
               The complete analysis is also displayed below for your convenience.
             </p>
@@ -300,6 +314,8 @@ export default function CampaignGeneratorPage() {
                 setPositioning('');
                 setAnalysisData(null);
                 setCopiedIndex(null);
+                setError('');
+                setErrorDetails('');
               }}
               className="inline-flex items-center px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-all"
             >
@@ -461,11 +477,16 @@ export default function CampaignGeneratorPage() {
 
                   {/* Error Message */}
                   {error && (
-                    <div className="flex items-center p-4 bg-red-50 text-red-700 rounded-lg">
-                      <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="flex items-start p-4 bg-red-50 text-red-700 rounded-lg">
+                      <svg className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      <span className="text-sm">{error}</span>
+                      <div>
+                        <p className="text-sm font-medium">{error}</p>
+                        {errorDetails && (
+                          <p className="text-sm mt-1">{errorDetails}</p>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -485,7 +506,7 @@ export default function CampaignGeneratorPage() {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                         </svg>
-                        AI is analyzing your website...
+                        <span className="animate-pulse">Verifying email & analyzing website...</span>
                       </div>
                     ) : (
                       <div className="flex items-center justify-center">
@@ -509,13 +530,13 @@ export default function CampaignGeneratorPage() {
                     <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    GDPR Compliant
+                    Email Verified
                   </span>
                   <span className="flex items-center">
                     <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    SOC 2 Type II
+                    GDPR Compliant
                   </span>
                   <span className="flex items-center">
                     <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
