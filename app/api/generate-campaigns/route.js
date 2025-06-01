@@ -419,125 +419,116 @@ FINAL REMINDER: Output ONLY the JSON object. No explanations, no markdown format
 // --- Function to send email with analysis ---
 async function sendEmailReport(email, companyName, claudeAnalysisJson) {
   try {
-    // ALTERNATIVE AND ROBUST HTML escaping function - jasdhasdh#22
+    // CORRECTED HTML escaping function
     const escapeHtml = (unsafe) => {
-      if (typeof unsafe !== 'string') return '';
-      return unsafe.replace(/[&<>"']/g, function (match) {
-        switch (match) {
-          case '&':
-            return '&';
-          case '<':
-            return '<';
-          case '>':
-            return '>';
-          case '"':
-            return '"';
-          case "'":
-            return '''; // HTML entity for single quote
-          default:
-            return match;
-        }
-      });
+        if (typeof unsafe !== 'string') return '';
+        return unsafe
+             .replace(/&/g, "&")
+             .replace(/</g, "<")
+             .replace(/>/g, ">")
+             .replace(/"/g, """)
+             .replace(/'/g, "'");
     };
     
-    // Using string concatenation for email HTML (as per previous correct version)
-    let emailHtmlForUser = '<!DOCTYPE html>\n';
-    emailHtmlForUser += '<html>\n';
-    emailHtmlForUser += '<head>\n';
-    emailHtmlForUser += '  <meta charset="utf-8">\n';
-    emailHtmlForUser += '  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n';
-    emailHtmlForUser += '  <style>\n';
-    emailHtmlForUser += "    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 700px; margin: 0 auto; padding: 20px; }\n";
-    emailHtmlForUser += '    h1, h2, h3, h4 { color: #1f2937; }\n';
-    emailHtmlForUser += '    h2 { margin-top: 30px; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;}\n';
-    emailHtmlForUser += '    h3 { margin-top: 20px; color: #4f46e5; font-size: 1.25em; }\n';
-    emailHtmlForUser += '    h4 { margin-top: 15px; color: #1f2937; font-size: 1.1em; }\n';
-    emailHtmlForUser += '    .campaign-card { background: #f9fafb; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #e5e7eb;}\n';
-    emailHtmlForUser += "    .email-body { background: #ffffff; padding: 10px; border-left: 3px solid #4f46e5; margin-top: 5px; white-space: pre-line; font-style: italic; font-size: 0.95em; }\n";
-    emailHtmlForUser += '    .note { background: #fef3c7; border-left: 3px solid #f59e0b; padding: 10px; margin-top: 15px; border-radius: 4px; }\n';
-    emailHtmlForUser += '    .pitch-section { background: #4f46e5; color: white; padding: 20px; border-radius: 8px; text-align: center; margin-top:30px; }\n';
-    emailHtmlForUser += '    .pitch-section h2 { color: white; border: none;}\n';
-    emailHtmlForUser += "    .pitch-section a { display: inline-block; background: white; color: #4f46e5; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold; margin-top:15px;}\n";
-    emailHtmlForUser += '    ul { padding-left: 20px; list-style-position: inside; }\n';
-    emailHtmlForUser += '    li { margin-bottom: 5px; }\n';
-    emailHtmlForUser += '  </style>\n';
-    emailHtmlForUser += '</head>\n';
-    emailHtmlForUser += '<body>\n';
-    emailHtmlForUser += '  <div style="text-align: center; margin-bottom: 40px;">\n';
-    emailHtmlForUser += '    <h1 style="margin: 0; font-size: 2em;">VeoGrowth</h1>\n';
-    emailHtmlForUser += '    <p style="color: #6b7280; margin-top: 5px;">AI-Powered B2B Lead Generation</p>\n';
-    emailHtmlForUser += '  </div>\n';
-    emailHtmlForUser += '\n';
-    emailHtmlForUser += '  <div style="background: #f3f4f6; padding: 20px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #e5e7eb;">\n';
-    emailHtmlForUser += `    <h2 style="margin-top: 0; border:none; font-size: 1.5em;">Your Campaign Analysis for ${escapeHtml(companyName)}</h2>\n`;
-    emailHtmlForUser += '    <p style="color: #4b5563;">Thank you for using VeoGrowth! Here\'s the AI-generated analysis:</p>\n';
-    emailHtmlForUser += '  </div>\n';
-    emailHtmlForUser += '\n';
-    emailHtmlForUser += '  <div>\n';
-    emailHtmlForUser += '    <h2>Positioning Assessment</h2>\n';
-    emailHtmlForUser += `    <p>${escapeHtml(claudeAnalysisJson.positioningAssessmentOutput) || 'Not available.'}</p>\n`;
-    emailHtmlForUser += '\n';
-    emailHtmlForUser += '    <h2>Ideal Customer Profile</h2>\n';
-    emailHtmlForUser += `    <p><strong>Industry:</strong> ${escapeHtml(claudeAnalysisJson.idealCustomerProfile?.industry) || 'N/A'}</p>\n`;
-    emailHtmlForUser += `    <p><strong>Company Size:</strong> ${escapeHtml(claudeAnalysisJson.idealCustomerProfile?.companySize) || 'N/A'}</p>\n`;
-    emailHtmlForUser += '    <p><strong>Key Characteristics:</strong></p>\n';
-    emailHtmlForUser += `    <ul>${(claudeAnalysisJson.idealCustomerProfile?.keyCharacteristics || []).map(char => `<li>${escapeHtml(char)}</li>`).join('')}</ul>\n`;
-    emailHtmlForUser += '\n';
-    emailHtmlForUser += '    <h2>Key Personas</h2>\n';
-    emailHtmlForUser += `${(claudeAnalysisJson.keyPersonas || []).map(persona => `
-      <div class="campaign-card" style="background:#eef2ff; border-left: 3px solid #6366f1;">
-        <h4>${escapeHtml(persona.title) || 'N/A'}</h4>
-        <p><strong>Pain Points:</strong> ${escapeHtml(persona.painPoints) || 'N/A'}</p>
-      </div>
-    `).join('')}\n`;
-    emailHtmlForUser += '\n';
-    emailHtmlForUser += '    <h2>Campaign Ideas</h2>\n';
-    emailHtmlForUser += `${(claudeAnalysisJson.campaignIdeas || []).map(campaign => `
-      <div class="campaign-card">
-        <h3>${escapeHtml(campaign.name) || 'N/A'}</h3>
-        <p><strong>Target:</strong> ${escapeHtml(campaign.target) || 'N/A'}</p>
-        <p><strong>Example Email:</strong></p>
-        <div class="email-body">${(campaign.emailBody || 'N/A').replace(/\\n/g, '<br>')}</div>
-      </div>
-    `).join('')}\n`;
-    emailHtmlForUser += '\n';
-    emailHtmlForUser += `${(claudeAnalysisJson.socialProofNote && claudeAnalysisJson.socialProofNote.trim() !== "") ? `
-      <div class="note">
-        <h4>⚠️ Note on Social Proof</h4>
-        <p>${escapeHtml(claudeAnalysisJson.socialProofNote)}</p>
-      </div>
-    ` : ''}\n`;
-    emailHtmlForUser += '    \n';
-    emailHtmlForUser += '    <div style="margin-top:30px; padding-top:20px; border-top:1px solid #e5e7eb;">\n';
-    emailHtmlForUser += `      <p><strong>VeoGrowth Pitch:</strong> ${escapeHtml(claudeAnalysisJson.veoGrowthPitch) || ''}</p>\n`;
-    emailHtmlForUser += `      <p><em>${escapeHtml(claudeAnalysisJson.prospectTargetingNote) || ''}</em></p>\n`;
-    emailHtmlForUser += '    </div>\n';
-    emailHtmlForUser += '  </div>\n';
-    emailHtmlForUser += '\n';
-    emailHtmlForUser += '  <div class="pitch-section">\n';
-    emailHtmlForUser += '    <h2>Ready to Execute These Campaigns?</h2>\n';
-    emailHtmlForUser += '    <p>VeoGrowth will implement these campaigns for you: Build targeted lists, craft hyper-personalized messages, and book qualified meetings.</p>\n';
-    emailHtmlForUser += '    <a href="https://calendly.com/veogrowth/strategy">Book a Strategy Call</a>\n';
-    emailHtmlForUser += '  </div>\n';
-    emailHtmlForUser += '\n';
-    emailHtmlForUser += '  <div style="text-align: center; color: #6b7280; font-size: 14px; margin-top:30px;">\n';
-    emailHtmlForUser += '    <p>Questions? Reply to this email and I\'ll personally respond.</p>\n';
-    emailHtmlForUser += '    <p style="margin-top: 20px;">\n';
-    emailHtmlForUser += '      Best regards,<br>\n';
-    emailHtmlForUser += '      <strong>Dmitry Pinchuk</strong><br>\n';
-    emailHtmlForUser += '      Founder, VeoGrowth\n';
-    emailHtmlForUser += '    </p>\n';
-    emailHtmlForUser += '  </div>\n';
-    emailHtmlForUser += '</body>\n';
-    emailHtmlForUser += '</html>';
+    // Using the same well-structured email template
+    const emailHtmlForUser = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 700px; margin: 0 auto; padding: 20px; }
+          h1, h2, h3, h4 { color: #1f2937; }
+          h2 { margin-top: 30px; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;}
+          h3 { margin-top: 20px; color: #4f46e5; font-size: 1.25em; }
+          h4 { margin-top: 15px; color: #1f2937; font-size: 1.1em; }
+          .campaign-card { background: #f9fafb; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #e5e7eb;}
+          .email-body { background: #ffffff; padding: 10px; border-left: 3px solid #4f46e5; margin-top: 5px; white-space: pre-line; font-style: italic; font-size: 0.95em; }
+          .note { background: #fef3c7; border-left: 3px solid #f59e0b; padding: 10px; margin-top: 15px; border-radius: 4px; }
+          .pitch-section { background: #4f46e5; color: white; padding: 20px; border-radius: 8px; text-align: center; margin-top:30px; }
+          .pitch-section h2 { color: white; border: none;}
+          .pitch-section a { display: inline-block; background: white; color: #4f46e5; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold; margin-top:15px;}
+          ul { padding-left: 20px; list-style-position: inside; }
+          li { margin-bottom: 5px; }
+        </style>
+      </head>
+      <body>
+        <div style="text-align: center; margin-bottom: 40px;">
+          <h1 style="margin: 0; font-size: 2em;">VeoGrowth</h1>
+          <p style="color: #6b7280; margin-top: 5px;">AI-Powered B2B Lead Generation</p>
+        </div>
 
+        <div style="background: #f3f4f6; padding: 20px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #e5e7eb;">
+          <h2 style="margin-top: 0; border:none; font-size: 1.5em;">Your Campaign Analysis for ${escapeHtml(companyName)}</h2>
+          <p style="color: #4b5563;">Thank you for using VeoGrowth! Here's the AI-generated analysis:</p>
+        </div>
+
+        <div>
+          <h2>Positioning Assessment</h2>
+          <p>${escapeHtml(claudeAnalysisJson.positioningAssessmentOutput) || 'Not available.'}</p>
+
+          <h2>Ideal Customer Profile</h2>
+          <p><strong>Industry:</strong> ${escapeHtml(claudeAnalysisJson.idealCustomerProfile?.industry) || 'N/A'}</p>
+          <p><strong>Company Size:</strong> ${escapeHtml(claudeAnalysisJson.idealCustomerProfile?.companySize) || 'N/A'}</p>
+          <p><strong>Key Characteristics:</strong></p>
+          <ul>${(claudeAnalysisJson.idealCustomerProfile?.keyCharacteristics || []).map(char => `<li>${escapeHtml(char)}</li>`).join('')}</ul>
+
+          <h2>Key Personas</h2>
+          ${(claudeAnalysisJson.keyPersonas || []).map(persona => `
+            <div class="campaign-card" style="background:#eef2ff; border-left: 3px solid #6366f1;">
+              <h4>${escapeHtml(persona.title) || 'N/A'}</h4>
+              <p><strong>Pain Points:</strong> ${escapeHtml(persona.painPoints) || 'N/A'}</p>
+            </div>
+          `).join('')}
+
+          <h2>Campaign Ideas</h2>
+          ${(claudeAnalysisJson.campaignIdeas || []).map(campaign => `
+            <div class="campaign-card">
+              <h3>${escapeHtml(campaign.name) || 'N/A'}</h3>
+              <p><strong>Target:</strong> ${escapeHtml(campaign.target) || 'N/A'}</p>
+              <p><strong>Example Email:</strong></p>
+              <div class="email-body">${(campaign.emailBody || 'N/A').replace(/\\n/g, '<br>')}</div>
+            </div>
+          `).join('')}
+
+          ${(claudeAnalysisJson.socialProofNote && claudeAnalysisJson.socialProofNote.trim() !== "") ? `
+            <div class="note">
+              <h4>⚠️ Note on Social Proof</h4>
+              <p>${escapeHtml(claudeAnalysisJson.socialProofNote)}</p>
+            </div>
+          ` : ''}
+          
+          <div style="margin-top:30px; padding-top:20px; border-top:1px solid #e5e7eb;">
+            <p><strong>VeoGrowth Pitch:</strong> ${escapeHtml(claudeAnalysisJson.veoGrowthPitch) || ''}</p>
+            <p><em>${escapeHtml(claudeAnalysisJson.prospectTargetingNote) || ''}</em></p>
+          </div>
+        </div>
+
+        <div class="pitch-section">
+          <h2>Ready to Execute These Campaigns?</h2>
+          <p>VeoGrowth will implement these campaigns for you: Build targeted lists, craft hyper-personalized messages, and book qualified meetings.</p>
+          <a href="https://calendly.com/veogrowth/strategy">Book a Strategy Call</a>
+        </div>
+
+        <div style="text-align: center; color: #6b7280; font-size: 14px; margin-top:30px;">
+          <p>Questions? Reply to this email and I'll personally respond.</p>
+          <p style="margin-top: 20px;">
+            Best regards,<br>
+            <strong>Dmitry Pinchuk</strong><br>
+            Founder, VeoGrowth
+          </p>
+        </div>
+      </body>
+      </html>
+    `;
 
     const { data, error } = await resend.emails.send({
-      from: 'VeoGrowth <campaigns@veogrowth.com>', 
+      from: 'VeoGrowth <campaigns@veogrowth.com>', // Make sure this sending address is verified with Resend
       to: email,
       subject: `Your B2B Cold Email Campaigns for ${companyName}`,
       html: emailHtmlForUser,
-      replyTo: 'dmitry@veogrowth.com' 
+      replyTo: 'dmitry@veogrowth.com' // Your actual reply-to email
     });
 
     if (error) {
