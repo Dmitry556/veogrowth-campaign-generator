@@ -632,7 +632,25 @@ export async function POST(req) {
       return Response.json({ success: false, error: 'Missing required fields' }, { status: 400 });
     }
 
-    console.log('New lead:', { email, website, positioning, timestamp: new Date() });
+    // Validate and normalize website URL
+    let normalizedWebsite = website.trim();
+    
+    // Remove trailing slash
+    normalizedWebsite = normalizedWebsite.replace(/\/$/, '');
+    
+    // Add https:// if no protocol is specified
+    if (!normalizedWebsite.match(/^https?:\/\//i)) {
+      normalizedWebsite = 'https://' + normalizedWebsite;
+    }
+    
+    // Validate URL format
+    try {
+      new URL(normalizedWebsite);
+    } catch (err) {
+      return Response.json({ success: false, error: 'Invalid website URL format' }, { status: 400 });
+    }
+
+    console.log('New lead:', { email, website: normalizedWebsite, positioning, timestamp: new Date() });
 
     // Verify email with LeadMagic
     console.log('Verifying email with LeadMagic...');
@@ -659,16 +677,16 @@ export async function POST(req) {
       return Response.json({ success: false, error: 'AI module not configured (API Key missing).' }, { status: 500 });
     }
 
-    // Extract company name from URL
-    const companyNameFromUrl = website.replace(/https?:\/\//, '').replace('www.', '').split('/')[0];
+    // Extract company name from URL (domain part only, lowercase)
+    const companyNameFromUrl = normalizedWebsite.toLowerCase().replace(/https?:\/\//, '').replace('www.', '').split('/')[0];
 
     // Prepare the prompt
     const finalPrompt = CLAUDE_METAPROMPT
-      .replace(/{website}/g, website)
+      .replace(/{website}/g, normalizedWebsite)
       .replace(/{company}/g, companyNameFromUrl)
       .replace(/{positioning}/g, positioning);
     
-    console.log(`Starting Claude 4 Sonnet task for ${website} with web search...`);
+    console.log(`Starting Claude 4 Sonnet task for ${normalizedWebsite} with web search...`);
     console.log('Anthropic client properties:', {
       keys: Object.keys(anthropic),
       hasBeta: !!anthropic.beta,
@@ -850,7 +868,7 @@ export async function POST(req) {
       success: true,
       data: { 
         companyName: companyNameFromUrl, 
-        website: website,
+        website: normalizedWebsite,
         positioningInput: positioning,
         analysis: finalAnalysisJson,
         emailVerification: {
