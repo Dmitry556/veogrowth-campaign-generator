@@ -10,6 +10,13 @@ export default function CampaignGeneratorPage() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [analysisData, setAnalysisData] = useState(null);
+  const [copiedIndex, setCopiedIndex] = useState(null);
+
+  const copyToClipboard = (text, index) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -56,8 +63,20 @@ export default function CampaignGeneratorPage() {
   if (submitted && analysisData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+        {/* Print styles */}
+        <style dangerouslySetInnerHTML={{ __html: `
+          @media print {
+            .no-print {
+              display: none !important;
+            }
+            .print-break-inside-avoid {
+              break-inside: avoid;
+            }
+          }
+        `}} />
+
         {/* Animated background */}
-        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="fixed inset-0 overflow-hidden pointer-events-none no-print">
           <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
           <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse" style={{ animationDelay: '2s' }}></div>
           <div className="absolute top-40 left-40 w-80 h-80 bg-indigo-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse" style={{ animationDelay: '4s' }}></div>
@@ -74,89 +93,182 @@ export default function CampaignGeneratorPage() {
             <h1 className="text-4xl font-bold text-gray-900 mb-4">
               Analysis Complete! 🎉
             </h1>
-            <p className="text-xl text-gray-600">
+            <p className="text-xl text-gray-600 mb-2">
               Your AI-powered campaign analysis has been sent to <span className="font-semibold text-gray-900">{email}</span>
+            </p>
+            <p className="text-lg text-gray-500">
+              The complete analysis is also displayed below for your convenience.
             </p>
           </div>
 
-          {/* Analysis Preview */}
-          <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-              <svg className="w-6 h-6 text-yellow-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-              </svg>
-              Campaign Analysis Preview
-            </h2>
-
-            {/* Company Info */}
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <svg className="w-5 h-5 text-gray-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                  </svg>
-                  <span className="text-gray-700 font-medium">{analysisData.companyName}</span>
-                </div>
-                <div className="text-sm text-gray-500">
-                  Positioning: <span className="font-medium capitalize">{analysisData.positioningInput}</span>
-                </div>
+          {/* Quick Summary Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div className="bg-white p-6 rounded-xl shadow-md text-center">
+              <div className="text-3xl font-bold text-blue-600">3</div>
+              <div className="text-sm text-gray-600 mt-1">Campaign Ideas</div>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-md text-center">
+              <div className="text-3xl font-bold text-purple-600">3</div>
+              <div className="text-sm text-gray-600 mt-1">Key Personas</div>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-md text-center">
+              <div className="text-3xl font-bold text-green-600">
+                {analysisData.analysis.prospectTargetingNote?.match(/(\d+,\d+)/)?.[0] || '10,000+'}
               </div>
+              <div className="text-sm text-gray-600 mt-1">Target Prospects</div>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-md text-center">
+              <div className="text-3xl font-bold text-indigo-600">
+                {analysisData.analysis.positioningAssessmentOutput.startsWith('✅') ? '✅' : 
+                 analysisData.analysis.positioningAssessmentOutput.startsWith('⚠️') ? '⚠️' : '❌'}
+              </div>
+              <div className="text-sm text-gray-600 mt-1">Positioning</div>
+            </div>
+          </div>
+
+          {/* Full Analysis */}
+          <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 flex items-center">
+                <svg className="w-6 h-6 text-yellow-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                </svg>
+                Your Campaign Analysis for {analysisData.companyName}
+              </h2>
+              <button
+                onClick={() => window.print()}
+                className="text-sm text-gray-500 hover:text-gray-700 flex items-center px-3 py-1 rounded-md hover:bg-gray-100 transition-all no-print"
+              >
+                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                Print / Save as PDF
+              </button>
             </div>
 
             {/* Positioning Assessment */}
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Positioning Assessment</h3>
-              <p className="text-gray-700">{analysisData.analysis.positioningAssessmentOutput}</p>
+            <div className="mb-8">
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">Positioning Assessment</h3>
+              <div className="p-4 bg-blue-50 rounded-lg">
+                <p className="text-gray-700">{analysisData.analysis.positioningAssessmentOutput}</p>
+              </div>
             </div>
 
-            {/* ICP Preview */}
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2 flex items-center">
-                <svg className="w-5 h-5 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                Ideal Customer Profile
-              </h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-500">Industry:</span>
-                  <p className="font-medium text-gray-900">{analysisData.analysis.idealCustomerProfile.industry}</p>
+            {/* Ideal Customer Profile */}
+            <div className="mb-8">
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">Ideal Customer Profile</h3>
+              <div className="bg-gray-50 p-6 rounded-lg">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <span className="text-sm text-gray-500 uppercase tracking-wide">Industry</span>
+                    <p className="font-medium text-gray-900 mt-1">{analysisData.analysis.idealCustomerProfile.industry}</p>
+                  </div>
+                  <div>
+                    <span className="text-sm text-gray-500 uppercase tracking-wide">Company Size</span>
+                    <p className="font-medium text-gray-900 mt-1">{analysisData.analysis.idealCustomerProfile.companySize}</p>
+                  </div>
                 </div>
                 <div>
-                  <span className="text-gray-500">Company Size:</span>
-                  <p className="font-medium text-gray-900">{analysisData.analysis.idealCustomerProfile.companySize}</p>
+                  <span className="text-sm text-gray-500 uppercase tracking-wide">Key Characteristics</span>
+                  <ul className="mt-2 space-y-2">
+                    {analysisData.analysis.idealCustomerProfile.keyCharacteristics.map((char, index) => (
+                      <li key={index} className="flex items-start">
+                        <svg className="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-gray-700">{char}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
             </div>
 
-            {/* Campaign Count */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">3</div>
-                <div className="text-sm text-gray-600">Campaign Ideas</div>
-              </div>
-              <div className="text-center p-4 bg-purple-50 rounded-lg">
-                <div className="text-2xl font-bold text-purple-600">3</div>
-                <div className="text-sm text-gray-600">Key Personas</div>
-              </div>
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">
-                  {analysisData.analysis.prospectTargetingNote?.match(/(\d+,\d+)/)?.[0] || '10,000+'}
-                </div>
-                <div className="text-sm text-gray-600">Prospects</div>
+            {/* Key Personas */}
+            <div className="mb-8">
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">Key Personas</h3>
+              <div className="space-y-4">
+                {analysisData.analysis.keyPersonas.map((persona, index) => (
+                  <div key={index} className="bg-indigo-50 p-6 rounded-lg print-break-inside-avoid">
+                    <h4 className="font-semibold text-gray-900 mb-2">{persona.title}</h4>
+                    <p className="text-gray-700">
+                      <span className="font-medium">Pain Points:</span> {persona.painPoints}
+                    </p>
+                  </div>
+                ))}
               </div>
             </div>
 
-            <div className="border-t pt-6">
-              <p className="text-sm text-gray-600 mb-4">
-                <strong>Next Steps:</strong> Check your email for the complete analysis including all campaign ideas, 
-                key personas, and detailed targeting strategies.
+            {/* Campaign Ideas */}
+            <div className="mb-8">
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">Campaign Ideas</h3>
+              <div className="space-y-6">
+                {analysisData.analysis.campaignIdeas.map((campaign, index) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-6 print-break-inside-avoid">
+                    <div className="flex items-start justify-between mb-4">
+                      <h4 className="text-lg font-semibold text-blue-600">{campaign.name}</h4>
+                      <button
+                        onClick={() => copyToClipboard(campaign.emailBody, index)}
+                        className={`text-sm flex items-center px-3 py-1 rounded-md transition-all no-print ${
+                          copiedIndex === index 
+                            ? 'bg-green-100 text-green-700' 
+                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        {copiedIndex === index ? (
+                          <>
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Copied!
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            Copy Email
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-3">
+                      <span className="font-medium">Target:</span> {campaign.target}
+                    </p>
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <p className="text-sm font-medium text-gray-600 mb-2">Example Email:</p>
+                      <p className="text-gray-700 italic">{campaign.emailBody}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Social Proof Note */}
+            {analysisData.analysis.socialProofNote && (
+              <div className="mb-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="flex">
+                  <svg className="w-5 h-5 text-yellow-600 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <p className="text-sm text-yellow-800">{analysisData.analysis.socialProofNote}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Prospect Targeting Note */}
+            <div className="mb-8 p-6 bg-gray-50 rounded-lg">
+              <p className="text-gray-700">
+                <span className="font-semibold">VeoGrowth Pitch:</span> {analysisData.analysis.veoGrowthPitch}
+              </p>
+              <p className="text-gray-600 mt-3 text-sm italic">
+                {analysisData.analysis.prospectTargetingNote}
               </p>
             </div>
           </div>
 
           {/* CTA Section */}
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-8 text-center text-white">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-8 text-center text-white no-print">
             <h3 className="text-2xl font-bold mb-4">Ready to Execute These Campaigns?</h3>
             <p className="text-blue-100 mb-6">
               VeoGrowth will implement these campaigns for you: Build targeted lists, 
@@ -175,8 +287,11 @@ export default function CampaignGeneratorPage() {
             </a>
           </div>
 
-          {/* Generate Another */}
-          <div className="text-center mt-8">
+          {/* Divider */}
+          <div className="border-t border-gray-200 my-8 no-print"></div>
+
+          {/* Generate Another + Contact */}
+          <div className="text-center space-y-4 no-print">
             <button
               onClick={() => {
                 setSubmitted(false);
@@ -184,11 +299,22 @@ export default function CampaignGeneratorPage() {
                 setWebsite('');
                 setPositioning('');
                 setAnalysisData(null);
+                setCopiedIndex(null);
               }}
-              className="text-gray-600 hover:text-gray-900 font-medium transition-colors"
+              className="inline-flex items-center px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-all"
             >
-              Generate Another Analysis →
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Generate Another Analysis
             </button>
+            
+            <p className="text-gray-500 text-sm">
+              Questions? Email me at{' '}
+              <a href="mailto:dmitry@veogrowth.com" className="text-blue-600 hover:underline">
+                dmitry@veogrowth.com
+              </a>
+            </p>
           </div>
         </div>
       </div>
