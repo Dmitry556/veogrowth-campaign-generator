@@ -6,6 +6,9 @@ import { Resend } from 'resend';
 // Initialize API clients
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
+  defaultHeaders: {
+    'anthropic-beta': 'web-search-2025-03-05'
+  }
 });
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -548,87 +551,168 @@ export async function POST(req) {
       .replace(/{positioning}/g, positioning);
     
     console.log(`Starting Claude 4 Sonnet task for ${website} with web search...`);
+    console.log('Anthropic client properties:', {
+      keys: Object.keys(anthropic),
+      hasBeta: !!anthropic.beta,
+      betaType: typeof anthropic.beta
+    });
     console.time("ClaudeFullProcess");
 
     // Call Claude 4 Sonnet with web search
     let claudeResponse;
     try {
-      // Using the Python SDK format adapted for JavaScript
-      const messageData = {
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 20000,
-        temperature: 1,
-        messages: [
-          {
-            role: "user",
-            content: finalPrompt
+      console.log('Calling Claude with web search...');
+      
+      // Check if beta namespace exists first
+      if (anthropic.beta && typeof anthropic.beta.messages === 'object') {
+        console.log('Found beta namespace, using beta.messages.create...');
+        claudeResponse = await anthropic.beta.messages.create({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 20000,
+          temperature: 1,
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: finalPrompt
+                }
+              ]
+            }
+          ],
+          tools: [
+            {
+              name: "web_search",
+              type: "web_search_20250305",
+              max_uses: 1
+            }
+          ],
+          thinking: {
+            type: "enabled",
+            budget_tokens: 5000
+          },
+          betas: ["web-search-2025-03-05"]
+        });
+      } else {
+        console.log('No beta namespace, trying regular messages.create...');
+        // Try without beta namespace
+        claudeResponse = await anthropic.messages.create({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 20000,
+          temperature: 1,
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: finalPrompt
+                }
+              ]
+            }
+          ],
+          tools: [
+            {
+              name: "web_search",
+              type: "web_search_20250305",
+              max_uses: 1
+            }
+          ],
+          thinking: {
+            type: "enabled",
+            budget_tokens: 5000
           }
-        ],
-        tools: [
-          {
-            name: "web_search",
-            type: "web_search_20250305",
-            max_uses: 1
-          }
-        ],
-        thinking: {
-          type: "enabled",
-          budget_tokens: 5000
-        }
-      };
-
-      // Add headers for beta features
-      const headers = {
-        'anthropic-beta': 'web-search-2025-03-05',
-        'anthropic-version': '2023-06-01'
-      };
-
-      claudeResponse = await anthropic.messages.create(messageData, { headers });
+        });
+      }
+      
+      console.log('Claude response received:', {
+        id: claudeResponse.id,
+        type: claudeResponse.type,
+        role: claudeResponse.role,
+        model: claudeResponse.model,
+        content: claudeResponse.content,
+        usage: claudeResponse.usage
+      });
       
     } catch (error) {
       console.error('Claude 4 API call failed:', error);
-      
-      // Fallback: Try Claude 3.5 Sonnet without web search if Claude 4 fails
-      console.log('Fallback: Trying Claude 3.5 Sonnet without web search...');
-      claudeResponse = await anthropic.messages.create({
-        model: "claude-3-5-sonnet-20241022",
-        max_tokens: 8000,
-        temperature: 0.7,
-        messages: [
-          {
-            role: "user",
-            content: finalPrompt + "\n\nIMPORTANT: Since web search is not available, use your knowledge about the company. If you don't have specific case studies, use the placeholder format '[Your Customer Case Study Here]*' as specified in the instructions."
-          }
-        ]
+      console.error('Error details:', {
+        message: error.message,
+        status: error.status,
+        type: error.type,
+        full_error: JSON.stringify(error, Object.getOwnPropertyNames(error), 2)
       });
+      
+      // Check if it's a model availability issue
+      if (error.message?.includes('model') || error.message?.includes('not found')) {
+        throw new Error('Claude 4 Sonnet (claude-sonnet-4-20250514) may not be available yet in the JavaScript SDK. The app requires this model with web search functionality.');
+      }
+      
+      throw error;
     }
 
     console.timeEnd("ClaudeFullProcess");
 
-    // Extract the response text
-    const claudeOutputText = claudeResponse.content?.[0]?.text || '';
+    // Extract the response text - handle different response structures
+    let claudeOutputText = '';
+    
+    if (claudeResponse.content && Array.isArray(claudeResponse.content)) {
+      // Look for text content in the response
+      for (const content of claudeResponse.content) {
+        if (content.type === 'text' && content.text) {
+          claudeOutputText = content.text;
+          break;
+        }
+      }
+    } else if (typeof claudeResponse.content === 'string') {
+      claudeOutputText = claudeResponse.content;
+    } else if (claudeResponse.completion) {
+      claudeOutputText = claudeResponse.completion;
+    }
+    
+    console.log("Claude response content structure:", {
+      has_content: !!claudeResponse.content,
+      content_type: typeof claudeResponse.content,
+      content_array_length: Array.isArray(claudeResponse.content) ? claudeResponse.content.length : 'not array',
+      first_content_item: claudeResponse.content?.[0],
+      full_response_keys: Object.keys(claudeResponse),
+      output_text_length: claudeOutputText.length
+    });
+    
     console.log("Raw Claude output (first 300 chars):", claudeOutputText.substring(0, 300));
 
     // Parse the JSON response
-    let finalAnalysisJson = safeJsonParse(claudeOutputText, "ClaudeOutput");
+    let finalAnalysisJson;
+    if (!claudeOutputText) {
+      console.error("Claude returned empty response!");
+      finalAnalysisJson = { error: "Empty response from Claude" };
+    } else {
+      finalAnalysisJson = safeJsonParse(claudeOutputText, "ClaudeOutput");
+    }
 
-    // Handle parsing errors
-    if (finalAnalysisJson.error) {
-      console.error("Claude did not return valid JSON. Raw output snippet:", claudeOutputText.substring(0, 1000));
+    // Handle parsing errors or empty responses
+    if (!claudeOutputText || finalAnalysisJson.error) {
+      console.error("Claude did not return valid JSON or returned empty response.");
+      console.error("Full Claude response:", JSON.stringify(claudeResponse, null, 2));
+      console.error("Extracted text:", claudeOutputText);
+      if (finalAnalysisJson.error) {
+        console.error("Parse error:", finalAnalysisJson.error);
+      }
       
-      // Send error email with fallback content
+      // Send error email with helpful debug info
       await sendEmailReport(email, companyNameFromUrl, { 
-        positioningAssessmentOutput: "Analysis generation encountered an error. Please try again.", 
+        positioningAssessmentOutput: "Analysis generation failed. The app requires Claude 4 Sonnet with web search functionality.", 
         idealCustomerProfile: { 
-          industry: "N/A", 
-          companySize: "N/A", 
-          keyCharacteristics: ["Error in analysis."]
+          industry: "Error", 
+          companySize: "Error", 
+          keyCharacteristics: ["Claude 4 Sonnet with web search is required but may not be available in JavaScript SDK yet."]
         }, 
         keyPersonas: [], 
         campaignIdeas: [],
-        socialProofNote: "Error: Could not generate detailed analysis due to an AI output issue.",
-        veoGrowthPitch: "Please try again or contact support at dmitry@veogrowth.com",
-        prospectTargetingNote: ""
+        socialProofNote: "Error: " + (claudeOutputText ? "Invalid response format" : "Empty response from API"),
+        veoGrowthPitch: "Please contact support at dmitry@veogrowth.com for assistance.",
+        prospectTargetingNote: "Debug: Check server logs for detailed error information."
       });
       
       return Response.json({ 
@@ -656,16 +740,11 @@ export async function POST(req) {
 
   } catch (error) {
     console.error('API Error in POST function:', error);
-    
-    if (error.response?.data) {
-      console.error('Anthropic API Error Details:', JSON.stringify(error.response.data, null, 2));
-    } else if (error.status && error.message) {
-      console.error(`API Call Error: ${error.status} ${error.message}`);
-    }
+    console.error('Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     
     return Response.json({ 
       success: false, 
-      error: 'Failed to generate analysis. Please try again.' 
+      error: 'Failed to generate analysis. Please check the logs for details.' 
     }, { status: 500 });
   }
 }
