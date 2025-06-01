@@ -51,15 +51,25 @@ async function verifyEmailWithLeadMagic(email) {
     const data = await response.json();
     console.log('LeadMagic verification result:', data);
 
-    // Only accept 'valid' and 'valid_catch_all' statuses
-    const validStatuses = ['valid', 'valid_catch_all'];
-    const isValid = validStatuses.includes(data.status || data.result);
+    // LeadMagic uses 'email_status' not 'status'
+    const status = data.email_status || data.status || data.result;
+    
+    // Accept valid, valid_catch_all, AND catch_all statuses
+    const validStatuses = ['valid', 'valid_catch_all', 'catch_all'];
+    const isValid = validStatuses.includes(status);
 
     const result = {
       isValid,
-      status: data.status || data.result,
-      company: data.company || null,
-      message: getVerificationMessage(data.status || data.result)
+      status: status,
+      company: data.company_name || data.company || null,
+      companyDetails: data.company_name ? {
+        name: data.company_name,
+        industry: data.company_industry,
+        size: data.company_size,
+        founded: data.company_founded,
+        linkedin: data.company_linkedin_url
+      } : null,
+      message: getVerificationMessage(status)
     };
 
     // Cache the result
@@ -91,11 +101,12 @@ function getVerificationMessage(status) {
   const messages = {
     'valid': 'Email verified successfully',
     'valid_catch_all': 'Email verified (catch-all domain)',
-    'catch_all': 'This domain accepts all emails - high bounce risk',
+    'catch_all': 'Email accepted (catch-all domain)',
     'unknown': 'Unable to verify this email address',
-    'invalid': 'This email address does not exist',
+    'invalid': 'This email address appears to be invalid',
     'api_error': 'Verification service temporarily unavailable',
-    'error': 'Verification failed - proceeding anyway'
+    'error': 'Verification failed - proceeding anyway',
+    'skipped': 'Email verification skipped'
   };
   return messages[status] || 'Unknown verification status';
 }
@@ -632,12 +643,16 @@ export async function POST(req) {
       return Response.json({ 
         success: false, 
         error: 'Invalid email address', 
-        details: verificationResult.message,
+        details: 'It seems like you entered an invalid email. Could you please double-check and enter the correct one?',
         verificationStatus: verificationResult.status
       }, { status: 400 });
     }
 
-    console.log('Email verified successfully:', verificationResult.status);
+    console.log('Email verified successfully:', {
+      status: verificationResult.status,
+      company: verificationResult.company,
+      isValid: verificationResult.isValid
+    });
 
     if (!process.env.ANTHROPIC_API_KEY) {
       console.error("Critical: ANTHROPIC_API_KEY not configured. Aborting.");
@@ -840,7 +855,8 @@ export async function POST(req) {
         analysis: finalAnalysisJson,
         emailVerification: {
           status: verificationResult.status,
-          company: verificationResult.company
+          company: verificationResult.company,
+          companyDetails: verificationResult.companyDetails
         }
       }
     });
