@@ -127,16 +127,74 @@ export default function CampaignGeneratorPage() {
         throw new Error('PDF library not available');
       }
 
+      // Clone the element to modify it for PDF
+      const clonedElement = element.cloneNode(true);
+      
+      // Apply PDF-specific styles to the clone
+      clonedElement.style.backgroundColor = '#0f172a';
+      clonedElement.style.padding = '20px';
+      
+      // Fix all glass cards to have solid backgrounds
+      const glassCards = clonedElement.querySelectorAll('.glass-card, .glass-card-dark');
+      glassCards.forEach(card => {
+        card.style.backgroundColor = 'rgba(30, 41, 59, 0.9)';
+        card.style.backdropFilter = 'none';
+        card.style.border = '1px solid rgba(71, 85, 105, 1)';
+      });
+
+      // Fix text colors
+      const allText = clonedElement.querySelectorAll('p, span, h1, h2, h3, h4, h5, h6, div, li');
+      allText.forEach(el => {
+        if (el.style.color === '' || el.style.color === 'inherit') {
+          const computedStyle = window.getComputedStyle(el);
+          if (computedStyle.color === 'rgb(255, 255, 255)' || computedStyle.color === 'white') {
+            el.style.color = '#ffffff';
+          }
+        }
+      });
+
+      // Fix email preview sections
+      const emailPreviews = clonedElement.querySelectorAll('.email-preview');
+      emailPreviews.forEach(preview => {
+        preview.style.backgroundColor = '#1a1a1a';
+        preview.style.border = '1px solid #374151';
+      });
+
+      // Remove animations
+      const animated = clonedElement.querySelectorAll('[class*="animate-"]');
+      animated.forEach(el => {
+        el.className = el.className.replace(/animate-\S+/g, '');
+      });
+
+      // Hide elements that shouldn't be in PDF
+      const noExportElements = clonedElement.querySelectorAll('.no-export, .no-print');
+      noExportElements.forEach(el => el.style.display = 'none');
+
+      // Append clone to body temporarily
+      clonedElement.style.position = 'absolute';
+      clonedElement.style.left = '-9999px';
+      clonedElement.style.width = '1200px';
+      document.body.appendChild(clonedElement);
+
       const opt = {
         margin: 10,
         filename: `VeoGrowth_Analysis_${analysisData.companyName}_${new Date().toISOString().split('T')[0]}.pdf`,
-        image: { type: 'jpeg', quality: 0.95 },
+        image: { 
+          type: 'jpeg', 
+          quality: 1 
+        },
         html2canvas: { 
           scale: 2,
           useCORS: true,
           logging: false,
-          letterRendering: true,
-          backgroundColor: '#0f172a'
+          backgroundColor: '#0f172a',
+          onclone: function(clonedDoc) {
+            // Additional fixes in the cloned document
+            const clonedElement = clonedDoc.querySelector('[data-pdf-content]');
+            if (clonedElement) {
+              clonedElement.style.backgroundColor = '#0f172a';
+            }
+          }
         },
         jsPDF: { 
           unit: 'mm', 
@@ -144,21 +202,21 @@ export default function CampaignGeneratorPage() {
           orientation: 'portrait'
         },
         pagebreak: { 
-          mode: 'avoid-all',
+          mode: 'css',
           before: '.page-break-before',
-          after: '.page-break-after' 
+          after: '.page-break-after',
+          avoid: 'img, .glass-card, .email-preview'
         }
       };
 
-      // Hide elements that shouldn't be in PDF
-      const noExportElements = element.querySelectorAll('.no-export');
-      noExportElements.forEach(el => el.style.display = 'none');
+      // Add identifier to cloned element
+      clonedElement.setAttribute('data-pdf-content', 'true');
 
-      // Generate and download PDF
-      await window.html2pdf().set(opt).from(element).save();
+      // Generate and download PDF from clone
+      await window.html2pdf().set(opt).from(clonedElement).save();
 
-      // Show hidden elements again
-      noExportElements.forEach(el => el.style.display = '');
+      // Remove clone
+      document.body.removeChild(clonedElement);
       
     } catch (error) {
       console.error('PDF generation failed:', error);
