@@ -14,6 +14,104 @@ export default function CampaignGeneratorPage() {
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [selectedCampaign, setSelectedCampaign] = useState(0);
 
+  // Animated counter hook
+  const useAnimatedCounter = (end, duration = 1000, startOnMount = false) => {
+    const [count, setCount] = useState(0);
+    const [hasStarted, setHasStarted] = useState(false);
+    const countRef = React.useRef(null);
+    const observerRef = React.useRef(null);
+
+    React.useEffect(() => {
+      if (startOnMount) {
+        startCounting();
+      } else {
+        // Set up intersection observer
+        observerRef.current = new IntersectionObserver(
+          (entries) => {
+            if (entries[0].isIntersecting && !hasStarted) {
+              startCounting();
+            @keyframes numberGlow {
+            0% {
+              text-shadow: 0 0 10px rgba(59, 130, 246, 0);
+            .glass-card:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+          @keyframes successPulse {
+            0% {
+              box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+            }
+            70% {
+              box-shadow: 0 0 0 10px rgba(34, 197, 94, 0);
+            }
+            100% {
+              box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+            }
+          }
+          .success-pulse {
+            animation: successPulse 0.7s ease-out;
+          }
+          .glass-card-dark:hover {
+            background: rgba(0, 0, 0, 0.3);
+            border-color: rgba(255, 255, 255, 0.2);
+          }
+          .hover-lift {
+            transition: all 0.3s ease;
+          }
+          .hover-lift:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+          }
+            50% {
+              text-shadow: 0 0 20px rgba(59, 130, 246, 0.8), 0 0 30px rgba(59, 130, 246, 0.6);
+            }
+            100% {
+              text-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+            }
+          }
+          .number-glow {
+            animation: numberGlow 0.6s ease-out;
+          }
+          },
+          { threshold: 0.5 }
+        );
+
+        if (countRef.current) {
+          observerRef.current.observe(countRef.current);
+        }
+
+        return () => {
+          if (observerRef.current) {
+            observerRef.current.disconnect();
+          }
+        };
+      }
+    }, []);
+
+    const startCounting = () => {
+      if (hasStarted) return;
+      setHasStarted(true);
+      
+      let startTime = null;
+      const step = (timestamp) => {
+        if (!startTime) startTime = timestamp;
+        const progress = Math.min((timestamp - startTime) / duration, 1);
+        
+        setCount(Math.floor(progress * end));
+        
+        if (progress < 1) {
+          requestAnimationFrame(step);
+        } else {
+          setCount(end);
+        }
+      };
+      
+      requestAnimationFrame(step);
+    };
+
+    return { count, ref: countRef };
+  };
+
   const copyToClipboard = (text, index) => {
     navigator.clipboard.writeText(text);
     setCopiedIndex(index);
@@ -88,6 +186,17 @@ export default function CampaignGeneratorPage() {
   };
 
   if (submitted && analysisData) {
+    // Parse prospect count for animation
+    const prospectMatch = analysisData.analysis.prospectTargetingNote?.match(/(\d+),?(\d+)?/);
+    const prospectCount = prospectMatch 
+      ? parseInt(prospectMatch[0].replace(/,/g, ''))
+      : 10000;
+    
+    // Animated counters
+    const campaignCounter = useAnimatedCounter(3, 800);
+    const personaCounter = useAnimatedCounter(3, 800);
+    const prospectCounter = useAnimatedCounter(prospectCount, 1200);
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900">
         {/* Print styles and animations */}
@@ -138,16 +247,6 @@ export default function CampaignGeneratorPage() {
               opacity: 1;
             }
           }
-          @keyframes countUp {
-            from {
-              opacity: 0;
-              transform: scale(0.8);
-            }
-            to {
-              opacity: 1;
-              transform: scale(1);
-            }
-          }
           @keyframes pulse {
             0%, 100% {
               opacity: 1;
@@ -186,9 +285,6 @@ export default function CampaignGeneratorPage() {
           }
           .animate-fade-in {
             animation: fadeIn 0.8s ease-out forwards;
-          }
-          .animate-count-up {
-            animation: countUp 0.5s ease-out forwards;
           }
           .animate-float {
             animation: float 3s ease-in-out infinite;
@@ -238,7 +334,7 @@ export default function CampaignGeneratorPage() {
         </div>
 
         <div className="relative max-w-7xl mx-auto px-4 py-8">
-          {/* AI Status Header */}
+          {/* AI Status Header with Logo */}
           <div className="mb-8 animate-slide-in-top">
             <div className="glass-card-dark rounded-2xl p-6">
               <div className="flex items-center justify-between">
@@ -253,8 +349,25 @@ export default function CampaignGeneratorPage() {
                   </div>
                 </div>
                 <div className="flex items-center space-x-6 text-sm">
-                  <div className="text-gray-300">
-                    <span className="text-gray-400">Company:</span> <span className="text-white font-medium">{analysisData.companyName}</span>
+                  {/* Company Logo and Name */}
+                  <div className="flex items-center space-x-3">
+                    <div className="relative w-12 h-12 bg-gray-800 rounded-lg overflow-hidden">
+                      <img 
+                        src={`https://img.logo.dev/${analysisData.companyName}?token=${process.env.NEXT_PUBLIC_LOGO_DEV_API_KEY || 'pk_J6hzITaoQMKcQsJe6XfCHQ'}&size=96&format=png`}
+                        alt={`${analysisData.companyName} logo`}
+                        className="w-full h-full object-contain"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.nextElementSibling.style.display = 'flex';
+                        }}
+                      />
+                      <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 items-center justify-center text-white font-bold text-lg hidden">
+                        {analysisData.companyName.charAt(0).toUpperCase()}
+                      </div>
+                    </div>
+                    <div className="text-gray-300">
+                      <span className="text-gray-400">Company:</span> <span className="text-white font-medium">{analysisData.companyName}</span>
+                    </div>
                   </div>
                   <div className="text-gray-300">
                     <span className="text-gray-400">Status:</span> <span className="text-green-400 font-medium">Verified</span>
@@ -272,49 +385,55 @@ export default function CampaignGeneratorPage() {
             </div>
           </div>
 
-          {/* Hero Insight Section - Better contrast */}
-          <div className="mb-6 animate-slide-in-top" style={{ animationDelay: '0.1s' }}>
-            <div className="glass-card rounded-xl p-6 text-center">
-              <h3 className="text-xl font-semibold text-white mb-2">
-                {analysisData.analysis.positioningAssessmentOutput.split(':')[0].replace('✅', '').replace('❌', '').replace('⚠️', '').trim()}
-              </h3>
+          {/* Hero Insight Section - Smaller since positioning moved */}
+          <div className="mb-4 animate-slide-in-top" style={{ animationDelay: '0.1s' }}>
+            <div className="glass-card rounded-xl p-4 text-center">
               <p className="text-base text-white max-w-2xl mx-auto">
                 {analysisData.analysis.positioningAssessmentOutput.split(':')[1]?.trim() || ''}
               </p>
-              <div className="mt-4 inline-flex items-center space-x-2 text-sm">
-                <span className="text-gray-300">Confidence:</span>
-                <div className="flex items-center">
-                  <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-blue-500 to-green-500 rounded-full" style={{ width: '94%' }}></div>
+            </div>
+          </div>
+
+          {/* Quick Summary Stats with Enhanced TAM */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div className="glass-card p-6 rounded-xl text-center animate-slide-in-left" style={{ animationDelay: '0.2s' }}>
+              <div ref={campaignCounter.ref} className={`text-4xl font-bold text-blue-400 ${campaignCounter.isComplete ? 'number-glow' : ''}`}>
+                {campaignCounter.count}
+              </div>
+              <div className="text-base text-white mt-2">Campaign Ideas</div>
+            </div>
+            <div className="glass-card p-6 rounded-xl text-center animate-slide-in-left" style={{ animationDelay: '0.3s' }}>
+              <div ref={personaCounter.ref} className={`text-4xl font-bold text-purple-400 ${personaCounter.isComplete ? 'number-glow' : ''}`}>
+                {personaCounter.count}
+              </div>
+              <div className="text-base text-white mt-2">Key Personas</div>
+            </div>
+            <div className="glass-card p-6 rounded-xl text-center animate-slide-in-right md:col-span-2 bg-gradient-to-br from-green-500/10 to-blue-500/10 border-2 border-green-400/30" style={{ animationDelay: '0.4s' }}>
+              <div className="flex items-center justify-center space-x-4">
+                <div className="text-center">
+                  <div ref={prospectCounter.ref} className={`text-5xl font-bold text-green-400 ${prospectCounter.isComplete ? 'number-glow' : ''}`}>
+                    {prospectCounter.count > 0 ? prospectCounter.count.toLocaleString() : '0'}
                   </div>
-                  <span className="ml-2 text-white font-medium">94%</span>
+                  <div className="text-lg text-white mt-2 font-semibold">Target Prospects Identified</div>
+                  <div className="text-sm text-gray-300 mt-1">Ready to be contacted</div>
+                </div>
+                <div className="hidden md:block">
+                  <svg className="w-20 h-20 text-green-400/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
                 </div>
               </div>
             </div>
           </div>
-
-          {/* Quick Summary Stats - Better Contrast */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <div className="glass-card p-6 rounded-xl text-center animate-slide-in-left" style={{ animationDelay: '0.2s' }}>
-              <div className="text-4xl font-bold text-blue-400 animate-count-up">3</div>
-              <div className="text-base text-white mt-2">Campaign Ideas</div>
-            </div>
-            <div className="glass-card p-6 rounded-xl text-center animate-slide-in-left" style={{ animationDelay: '0.3s' }}>
-              <div className="text-4xl font-bold text-purple-400 animate-count-up">3</div>
-              <div className="text-base text-white mt-2">Key Personas</div>
-            </div>
-            <div className="glass-card p-6 rounded-xl text-center animate-slide-in-right" style={{ animationDelay: '0.4s' }}>
-              <div className="text-4xl font-bold text-green-400 animate-count-up">
-                {analysisData.analysis.prospectTargetingNote?.match(/(\d+,\d+)/)?.[0] || '10,000+'}
-              </div>
-              <div className="text-base text-white mt-2">Target Prospects</div>
-            </div>
-            <div className="glass-card p-6 rounded-xl text-center animate-slide-in-right" style={{ animationDelay: '0.5s' }}>
-              <div className="text-4xl font-bold text-white animate-count-up">
+          
+          {/* Positioning Status - Moved to separate row */}
+          <div className="glass-card p-4 rounded-xl text-center animate-slide-in-top mb-8" style={{ animationDelay: '0.5s' }}>
+            <div className="flex items-center justify-center space-x-4">
+              <div className="text-lg text-gray-300">Positioning Status:</div>
+              <div className="text-2xl font-bold text-white">
                 {analysisData.analysis.positioningAssessmentOutput.startsWith('✅') ? 'Clear' : 
                  analysisData.analysis.positioningAssessmentOutput.startsWith('⚠️') ? 'Moderate' : 'Unclear'}
               </div>
-              <div className="text-base text-white mt-2">Positioning</div>
             </div>
           </div>
 
@@ -332,13 +451,23 @@ export default function CampaignGeneratorPage() {
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-blue-500/10 border border-blue-400/30 rounded-xl p-5">
+                <div className="bg-blue-500/10 border border-blue-400/30 rounded-xl p-5 hover-lift cursor-pointer">
                   <span className="text-sm text-blue-400 uppercase tracking-wide font-bold block mb-2">Industry Focus</span>
-                  <p className="text-white text-lg font-medium">{analysisData.analysis.idealCustomerProfile.industry}</p>
+                  <div className="flex items-center space-x-2">
+                    <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    <p className="text-white text-lg font-medium">{analysisData.analysis.idealCustomerProfile.industry}</p>
+                  </div>
                 </div>
-                <div className="bg-purple-500/10 border border-purple-400/30 rounded-xl p-5">
+                <div className="bg-purple-500/10 border border-purple-400/30 rounded-xl p-5 hover-lift cursor-pointer">
                   <span className="text-sm text-purple-400 uppercase tracking-wide font-bold block mb-2">Company Size</span>
-                  <p className="text-white text-lg font-medium">{analysisData.analysis.idealCustomerProfile.companySize}</p>
+                  <div className="flex items-center space-x-2">
+                    <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <p className="text-white text-lg font-medium">{analysisData.analysis.idealCustomerProfile.companySize}</p>
+                  </div>
                 </div>
               </div>
               
@@ -346,8 +475,35 @@ export default function CampaignGeneratorPage() {
                 <span className="text-sm text-green-400 uppercase tracking-wide font-bold block mb-4">Key Characteristics</span>
                 <div className="space-y-3">
                   {analysisData.analysis.idealCustomerProfile.keyCharacteristics.map((char, index) => (
-                    <div key={index} className="flex items-start bg-gray-800/30 rounded-lg p-4 border border-gray-700/50">
-                      <div className="w-2 h-2 bg-green-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                    <div key={index} className="flex items-start bg-gray-800/30 rounded-lg p-4 border border-gray-700/50 hover:bg-gray-800/50 hover:border-gray-600/50 transition-all cursor-pointer">
+                      <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
+                        {index === 0 && (
+                          <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                          </svg>
+                        )}
+                        {index === 1 && (
+                          <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                          </svg>
+                        )}
+                        {index === 2 && (
+                          <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        )}
+                        {index === 3 && (
+                          <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                        )}
+                        {index >= 4 && (
+                          <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                          </svg>
+                        )}
+                      </div>
                       <span className="text-white text-lg leading-relaxed">{char}</span>
                     </div>
                   ))}
@@ -369,10 +525,28 @@ export default function CampaignGeneratorPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {analysisData.analysis.keyPersonas.map((persona, index) => (
                   <div key={index} className="bg-gray-800/40 backdrop-blur border border-gray-700 rounded-xl p-6 hover:bg-gray-800/60 transition-all">
-                    <div className="w-14 h-14 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
+                    <div className="w-14 h-14 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                      {persona.title.toLowerCase().includes('ceo') || persona.title.toLowerCase().includes('founder') ? (
+                        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                      ) : persona.title.toLowerCase().includes('vp') || persona.title.toLowerCase().includes('director') ? (
+                        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                      ) : persona.title.toLowerCase().includes('manager') ? (
+                        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      ) : persona.title.toLowerCase().includes('head') || persona.title.toLowerCase().includes('lead') ? (
+                        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                      ) : (
+                        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                      )}
                     </div>
                     <h4 className="font-bold text-white text-xl text-center mb-4">{persona.title}</h4>
                     <div className="bg-black/30 rounded-lg p-4">
@@ -463,8 +637,8 @@ export default function CampaignGeneratorPage() {
                               onClick={() => copyToClipboard(campaign.emailBody, index)}
                               className={`px-5 py-2.5 rounded-lg transition-all flex items-center space-x-2 ${
                                 copiedIndex === index 
-                                  ? 'bg-green-500/20 text-green-400 border border-green-500/40 animate-glow' 
-                                  : 'glass-card text-white hover:text-blue-400 hover:border-blue-500/40'
+                                  ? 'bg-green-500/20 text-green-400 border border-green-500/40 success-pulse' 
+                                  : 'glass-card text-white hover:text-blue-400 hover:border-blue-500/40 hover:scale-105'
                               }`}
                             >
                               {copiedIndex === index ? (
@@ -604,6 +778,11 @@ export default function CampaignGeneratorPage() {
               Questions? Email me at{' '}
               <a href="mailto:dmitry@veogrowth.com" className="text-blue-400 hover:text-blue-300 transition-colors">
                 dmitry@veogrowth.com
+              </a>
+            </p>
+            <p className="text-gray-500 text-xs mt-4">
+              <a href="https://logo.dev" target="_blank" rel="noopener noreferrer" className="hover:text-gray-400 transition-colors">
+                Logos provided by Logo.dev
               </a>
             </p>
           </div>
