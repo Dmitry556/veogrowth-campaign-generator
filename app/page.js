@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 
-// Animated counter hook -- MUST be defined outside the component
+// Animated counter hook - MUST be defined outside the component
 function useAnimatedCounter(end, duration = 1000, startOnMount = false) {
   const [count, setCount] = useState(0);
   const [hasStarted, setHasStarted] = useState(false);
@@ -101,95 +101,58 @@ export default function CampaignGeneratorPage() {
     setDownloadingPDF(true);
 
     try {
-      // Check if html2pdf is already loaded
-      if (typeof window !== 'undefined' && !window.html2pdf) {
-        console.log('Loading html2pdf library...');
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-        
-        await new Promise((resolve, reject) => {
-          script.onload = () => {
-            console.log('html2pdf library loaded successfully');
-            resolve();
-          };
-          script.onerror = () => reject(new Error('Failed to load PDF library'));
-          document.head.appendChild(script);
-        });
-        
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
+      // Show instructions
+      const instructions = document.createElement('div');
+      instructions.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: #1f2937;
+        color: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        z-index: 10000;
+        text-align: center;
+        max-width: 500px;
+      `;
+      instructions.innerHTML = `
+        <h3 style="margin: 0 0 15px 0; font-size: 20px;">Generating PDF...</h3>
+        <p style="margin: 0 0 20px 0; line-height: 1.5;">
+          A print dialog will open. Please:<br/>
+          1. Select <strong>"Save as PDF"</strong> as destination<br/>
+          2. Check <strong>"Background graphics"</strong><br/>
+          3. Click <strong>"Save"</strong>
+        </p>
+        <button onclick="this.parentElement.remove()" style="
+          background: #3b82f6;
+          color: white;
+          border: none;
+          padding: 10px 20px;
+          border-radius: 5px;
+          cursor: pointer;
+          font-size: 16px;
+        ">Got it!</button>
+      `;
+      document.body.appendChild(instructions);
 
-      if (typeof window.html2pdf === 'undefined') {
-        throw new Error('PDF library not available after loading');
-      }
+      // Wait a moment for user to read
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-      console.log('Starting PDF generation...');
-      const element = contentRef.current;
-      
-      // Hide logo to avoid CORS issues
-      const logoElements = element.querySelectorAll('img[src*="logo.dev"], .pdf-logo, .pdf-hide-logo');
-      logoElements.forEach(el => {
-        el.style.display = 'none';
-      });
-      
-      // Hide no-export elements
-      const noExportElements = element.querySelectorAll('.no-export, .no-print');
-      noExportElements.forEach(el => {
-        el.style.display = 'none';
-      });
+      // Use native print
+      window.print();
 
-      // Simple options to match print output
-      const opt = {
-        margin: 5,
-        filename: `VeoGrowth_Analysis_${analysisData.companyName}_${new Date().toISOString().split('T')[0]}.pdf`,
-        image: { 
-          type: 'jpeg', 
-          quality: 1 
-        },
-        html2canvas: { 
-          scale: 2,
-          useCORS: false, // Disable CORS to avoid logo issues
-          logging: false,
-          backgroundColor: '#0f172a',
-          windowWidth: element.scrollWidth,
-          scrollX: 0,
-          scrollY: -window.scrollY
-        },
-        jsPDF: { 
-          unit: 'mm', 
-          format: 'a4', 
-          orientation: 'portrait',
-          compress: true
-        },
-        pagebreak: { 
-          mode: 'avoid-all', // No page breaks
-          before: [],
-          after: [],
-          avoid: 'img'
+      // Remove instructions after print dialog opens
+      setTimeout(() => {
+        if (instructions.parentNode) {
+          instructions.remove();
         }
-      };
-
-      console.log('Generating PDF...');
-      await window.html2pdf()
-        .set(opt)
-        .from(element)
-        .save();
-
-      console.log('PDF generated successfully');
-
-      // Restore hidden elements
-      logoElements.forEach(el => {
-        el.style.display = '';
-      });
-      noExportElements.forEach(el => {
-        el.style.display = '';
-      });
+      }, 1000);
       
     } catch (error) {
       console.error('PDF generation failed:', error);
-      if (window.confirm('PDF generation failed. Would you like to use the print dialog instead?')) {
-        window.print();
-      }
+      alert('Failed to open print dialog. Please press Ctrl+P (or Cmd+P on Mac) to print.');
     } finally {
       setDownloadingPDF(false);
     }
@@ -268,13 +231,11 @@ export default function CampaignGeneratorPage() {
         {/* Print styles and animations */}
         <style dangerouslySetInnerHTML={{ __html: `
           @media print {
-            .no-print, .no-export {
-              display: none !important;
+            @page {
+              size: A4;
+              margin: 10mm;
             }
-            .print-break-inside-avoid {
-              break-inside: avoid;
-            }
-            /* Dark theme for print */
+            
             body {
               background-color: #0f172a !important;
               color: white !important;
@@ -282,16 +243,64 @@ export default function CampaignGeneratorPage() {
               print-color-adjust: exact !important;
               color-adjust: exact !important;
             }
-            .glass-card, .glass-card-dark {
-              background-color: rgba(30, 41, 59, 0.9) !important;
-              border: 1px solid rgba(71, 85, 105, 1) !important;
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
+            
+            .no-print, .no-export {
+              display: none !important;
             }
+            
+            .print-break-inside-avoid {
+              break-inside: avoid;
+            }
+            
+            /* Force dark backgrounds */
             * {
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
               color-adjust: exact !important;
+            }
+            
+            /* Ensure glass cards have solid backgrounds */
+            .glass-card {
+              background-color: rgba(55, 65, 81, 0.9) !important;
+              backdrop-filter: none !important;
+            }
+            
+            .glass-card-dark {
+              background-color: rgba(31, 41, 59, 0.9) !important;
+              backdrop-filter: none !important;
+            }
+            
+            /* Fix gradients for print */
+            .bg-gradient-to-br {
+              background-image: none !important;
+              background-color: #0f172a !important;
+            }
+            
+            /* Ensure text is visible */
+            .text-white, .text-gray-100, .text-gray-200, .text-gray-300 {
+              color: white !important;
+            }
+            
+            /* Hide logo to avoid CORS issues */
+            img[src*="logo.dev"] {
+              display: none !important;
+            }
+            
+            /* Remove animations */
+            * {
+              animation: none !important;
+              transition: none !important;
+            }
+            
+            /* Avoid page breaks in important sections */
+            .glass-card, .email-preview, .bg-gradient-to-r, .bg-gradient-to-br {
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+            }
+            
+            /* Make sure content fits */
+            .max-w-7xl {
+              max-width: 100% !important;
             }
           }
           @keyframes slideInFromTop {
