@@ -3,6 +3,61 @@ export const maxDuration = 60; // Vercel timeout limit
 import Anthropic from '@anthropic-ai/sdk';
 import { Resend } from 'resend';
 
+// ============================================
+// DEVELOPMENT MODE - SET TO true TO USE MOCK DATA
+// ============================================
+const USE_MOCK_DATA = true; // Change to false for production
+
+// Mock data for testing (mimics real Claude output)
+const MOCK_ANALYSIS = {
+  positioningAssessmentOutput: "✅ CLEAR: Your positioning as an AI-powered B2B lead generation platform is crystal clear. You effectively communicate the value of hyper-personalized campaigns and qualified meeting generation.",
+  idealCustomerProfile: {
+    industry: "B2B SaaS, Agencies, Professional Services, Technology Companies",
+    companySize: "20-500 employees",
+    keyCharacteristics: [
+      "Companies struggling with inconsistent pipeline and relying on referrals",
+      "Sales teams spending 70% of time on prospecting instead of selling",
+      "Businesses with proven product-market fit ready to scale",
+      "Organizations with average deal sizes above $10K",
+      "Teams lacking dedicated SDR resources or outbound expertise"
+    ]
+  },
+  keyPersonas: [
+    {
+      title: "CEO/Founder",
+      painPoints: "Revenue unpredictability making it hard to plan, Sales team not hitting quota consistently, Spending too much time on sales instead of strategy, Referral pipeline drying up"
+    },
+    {
+      title: "VP Sales",
+      painPoints: "Team wasting time on manual prospecting, No visibility into pipeline health, Reps sending generic emails with 0.1% reply rates, Can't scale team without predictable pipeline"
+    },
+    {
+      title: "Head of Growth",
+      painPoints: "CAC through paid ads becoming unsustainable, Content marketing plateau reached, Need new scalable acquisition channel, Pressure to deliver MQLs but quality is poor"
+    }
+  ],
+  campaignIdeas: [
+    {
+      name: "The Pipeline Predictor",
+      target: "CEOs at B2B SaaS companies with 20-100 employees",
+      emailBody: "Hi [Name], running a 50-person SaaS company means revenue forecasting feels like reading tea leaves. When referrals are 80% of new business, one slow month creates panic. VeoGrowth built [SaaS Company] a system generating 25 qualified meetings monthly. Their pipeline became predictable for the first time. Worth exploring how we'd do this for [Company]?"
+    },
+    {
+      name: "The SDR Alternative",
+      target: "VP Sales at companies doing $2-10M ARR",
+      emailBody: "Hi [Name], most VP Sales at [Company Size] companies tell me their AEs waste 60% of their time prospecting instead of closing. Hiring SDRs seems risky without proven playbooks. We helped [Customer] generate 40 SQLs monthly without hiring a single SDR. Their AEs now focus purely on closing. Interested in seeing the exact system?"
+    },
+    {
+      name: "The Outbound Optimizer",
+      target: "Sales Teams at B2B companies with underperforming cold email",
+      emailBody: "Hi [Name], checked that [Company] has 12 salespeople. If they're like most teams, they're sending 100 emails to get 1 reply. We helped [Similar Company] go from 0.5% to 8% reply rates using AI personalization. That turned 1 meeting per week into 2 per day. Want to see how we'd optimize your sequences?"
+    }
+  ],
+  socialProofNote: "",
+  veoGrowthPitch: "Want VeoGrowth to execute these campaigns? We'll identify 5,000-8,000 companies struggling with pipeline predictability and show them how to build systematic outbound engines.",
+  prospectTargetingNote: "Note: These campaigns would target approximately 5,000-8,000 qualified prospects - B2B companies with 20-500 employees showing signs of referral dependency and sales team efficiency challenges."
+};
+
 // Initialize API clients
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -672,190 +727,157 @@ export async function POST(req) {
       isValid: verificationResult.isValid
     });
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-      console.error("Critical: ANTHROPIC_API_KEY not configured. Aborting.");
-      return Response.json({ success: false, error: 'AI module not configured (API Key missing).' }, { status: 500 });
-    }
-
     // Extract company name from URL (domain part only, lowercase)
     const companyNameFromUrl = normalizedWebsite.toLowerCase().replace(/https?:\/\//, '').replace('www.', '').split('/')[0];
 
-    // Prepare the prompt
-    const finalPrompt = CLAUDE_METAPROMPT
-      .replace(/{website}/g, normalizedWebsite)
-      .replace(/{company}/g, companyNameFromUrl)
-      .replace(/{positioning}/g, positioning);
-    
-    console.log(`Starting Claude 4 Sonnet task for ${normalizedWebsite} with web search...`);
-    console.log('Anthropic client properties:', {
-      keys: Object.keys(anthropic),
-      hasBeta: !!anthropic.beta,
-      betaType: typeof anthropic.beta
-    });
-    console.time("ClaudeFullProcess");
-
-    // Call Claude 4 Sonnet with web search
-    let claudeResponse;
-    try {
-      console.log('Calling Claude with web search...');
-      
-      // Check if beta namespace exists first
-      if (anthropic.beta && typeof anthropic.beta.messages === 'object') {
-        console.log('Found beta namespace, using beta.messages.create...');
-        claudeResponse = await anthropic.beta.messages.create({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 20000,
-          temperature: 1,
-          messages: [
-            {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: finalPrompt
-                }
-              ]
-            }
-          ],
-          tools: [
-            {
-              name: "web_search",
-              type: "web_search_20250305",
-              max_uses: 1
-            }
-          ],
-          thinking: {
-            type: "enabled",
-            budget_tokens: 5000
-          },
-          betas: ["web-search-2025-03-05"]
-        });
-      } else {
-        console.log('No beta namespace, trying regular messages.create...');
-        // Try without beta namespace
-        claudeResponse = await anthropic.messages.create({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 20000,
-          temperature: 1,
-          messages: [
-            {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: finalPrompt
-                }
-              ]
-            }
-          ],
-          tools: [
-            {
-              name: "web_search",
-              type: "web_search_20250305",
-              max_uses: 1
-            }
-          ],
-          thinking: {
-            type: "enabled",
-            budget_tokens: 5000
-          }
-        });
-      }
-      
-      console.log('Claude response received:', {
-        id: claudeResponse.id,
-        type: claudeResponse.type,
-        role: claudeResponse.role,
-        model: claudeResponse.model,
-        content: claudeResponse.content,
-        usage: claudeResponse.usage
-      });
-      
-    } catch (error) {
-      console.error('Claude 4 API call failed:', error);
-      console.error('Error details:', {
-        message: error.message,
-        status: error.status,
-        type: error.type,
-        full_error: JSON.stringify(error, Object.getOwnPropertyNames(error), 2)
-      });
-      
-      // Check if it's a model availability issue
-      if (error.message?.includes('model') || error.message?.includes('not found')) {
-        throw new Error('Claude 4 Sonnet (claude-sonnet-4-20250514) may not be available yet in the JavaScript SDK. The app requires this model with web search functionality.');
-      }
-      
-      throw error;
-    }
-
-    console.timeEnd("ClaudeFullProcess");
-
-    // Extract the response text - handle different response structures
-    let claudeOutputText = '';
-    
-    if (claudeResponse.content && Array.isArray(claudeResponse.content)) {
-      // Look for text content in the response
-      for (const content of claudeResponse.content) {
-        if (content.type === 'text' && content.text) {
-          claudeOutputText = content.text;
-          break;
-        }
-      }
-    } else if (typeof claudeResponse.content === 'string') {
-      claudeOutputText = claudeResponse.content;
-    } else if (claudeResponse.completion) {
-      claudeOutputText = claudeResponse.completion;
-    }
-    
-    console.log("Claude response content structure:", {
-      has_content: !!claudeResponse.content,
-      content_type: typeof claudeResponse.content,
-      content_array_length: Array.isArray(claudeResponse.content) ? claudeResponse.content.length : 'not array',
-      first_content_item: claudeResponse.content?.[0],
-      full_response_keys: Object.keys(claudeResponse),
-      output_text_length: claudeOutputText.length
-    });
-    
-    console.log("Raw Claude output (first 300 chars):", claudeOutputText.substring(0, 300));
-
-    // Parse the JSON response
     let finalAnalysisJson;
-    if (!claudeOutputText) {
-      console.error("Claude returned empty response!");
-      finalAnalysisJson = { error: "Empty response from Claude" };
-    } else {
-      finalAnalysisJson = safeJsonParse(claudeOutputText, "ClaudeOutput");
-    }
 
-    // Handle parsing errors or empty responses
-    if (!claudeOutputText || finalAnalysisJson.error) {
-      console.error("Claude did not return valid JSON or returned empty response.");
-      console.error("Full Claude response:", JSON.stringify(claudeResponse, null, 2));
-      console.error("Extracted text:", claudeOutputText);
-      if (finalAnalysisJson.error) {
-        console.error("Parse error:", finalAnalysisJson.error);
+    if (USE_MOCK_DATA) {
+      // ========================================
+      // USING MOCK DATA FOR DEVELOPMENT
+      // ========================================
+      console.log('🚨 DEVELOPMENT MODE: Using mock data instead of Claude API');
+      console.log('To use real API, set USE_MOCK_DATA = false');
+      
+      finalAnalysisJson = MOCK_ANALYSIS;
+      
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+    } else {
+      // ========================================
+      // PRODUCTION MODE: REAL CLAUDE API CALL
+      // ========================================
+      if (!process.env.ANTHROPIC_API_KEY) {
+        console.error("Critical: ANTHROPIC_API_KEY not configured. Aborting.");
+        return Response.json({ success: false, error: 'AI module not configured (API Key missing).' }, { status: 500 });
+      }
+
+      // Prepare the prompt
+      const finalPrompt = CLAUDE_METAPROMPT
+        .replace(/{website}/g, normalizedWebsite)
+        .replace(/{company}/g, companyNameFromUrl)
+        .replace(/{positioning}/g, positioning);
+      
+      console.log(`Starting Claude 4 Sonnet task for ${normalizedWebsite} with web search...`);
+      console.time("ClaudeFullProcess");
+
+      // Call Claude 4 Sonnet with web search
+      let claudeResponse;
+      try {
+        console.log('Calling Claude with web search...');
+        
+        // Check if beta namespace exists first
+        if (anthropic.beta && typeof anthropic.beta.messages === 'object') {
+          console.log('Found beta namespace, using beta.messages.create...');
+          claudeResponse = await anthropic.beta.messages.create({
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 20000,
+            temperature: 1,
+            messages: [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "text",
+                    text: finalPrompt
+                  }
+                ]
+              }
+            ],
+            tools: [
+              {
+                name: "web_search",
+                type: "web_search_20250305",
+                max_uses: 1
+              }
+            ],
+            thinking: {
+              type: "enabled",
+              budget_tokens: 5000
+            },
+            betas: ["web-search-2025-03-05"]
+          });
+        } else {
+          console.log('No beta namespace, trying regular messages.create...');
+          // Try without beta namespace
+          claudeResponse = await anthropic.messages.create({
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 20000,
+            temperature: 1,
+            messages: [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "text",
+                    text: finalPrompt
+                  }
+                ]
+              }
+            ],
+            tools: [
+              {
+                name: "web_search",
+                type: "web_search_20250305",
+                max_uses: 1
+              }
+            ],
+            thinking: {
+              type: "enabled",
+              budget_tokens: 5000
+            }
+          });
+        }
+        
+        console.log('Claude response received:', {
+          id: claudeResponse.id,
+          type: claudeResponse.type,
+          role: claudeResponse.role,
+          model: claudeResponse.model,
+          usage: claudeResponse.usage
+        });
+        
+      } catch (error) {
+        console.error('Claude 4 API call failed:', error);
+        throw error;
+      }
+
+      console.timeEnd("ClaudeFullProcess");
+
+      // Extract the response text
+      let claudeOutputText = '';
+      
+      if (claudeResponse.content && Array.isArray(claudeResponse.content)) {
+        for (const content of claudeResponse.content) {
+          if (content.type === 'text' && content.text) {
+            claudeOutputText = content.text;
+            break;
+          }
+        }
+      } else if (typeof claudeResponse.content === 'string') {
+        claudeOutputText = claudeResponse.content;
       }
       
-      // Send error email with helpful debug info
-      await sendEmailReport(email, companyNameFromUrl, { 
-        positioningAssessmentOutput: "Analysis generation failed. The app requires Claude 4 Sonnet with web search functionality.", 
-        idealCustomerProfile: { 
-          industry: "Error", 
-          companySize: "Error", 
-          keyCharacteristics: ["Claude 4 Sonnet with web search is required but may not be available in JavaScript SDK yet."]
-        }, 
-        keyPersonas: [], 
-        campaignIdeas: [],
-        socialProofNote: "Error: " + (claudeOutputText ? "Invalid response format" : "Empty response from API"),
-        veoGrowthPitch: "Please contact support at dmitry@veogrowth.com for assistance.",
-        prospectTargetingNote: "Debug: Check server logs for detailed error information."
-      });
-      
-      return Response.json({ 
-        success: false, 
-        error: "Failed to parse AI response. Email sent with error notification.", 
-        debug_output_snippet: claudeOutputText.substring(0, 1000) 
-      }, { status: 500 });
+      console.log("Raw Claude output (first 300 chars):", claudeOutputText.substring(0, 300));
+
+      // Parse the JSON response
+      if (!claudeOutputText) {
+        console.error("Claude returned empty response!");
+        finalAnalysisJson = { error: "Empty response from Claude" };
+      } else {
+        finalAnalysisJson = safeJsonParse(claudeOutputText, "ClaudeOutput");
+      }
+
+      // Handle parsing errors
+      if (finalAnalysisJson.error) {
+        console.error("Claude did not return valid JSON.");
+        return Response.json({ 
+          success: false, 
+          error: "Failed to parse AI response", 
+          debug_output_snippet: claudeOutputText.substring(0, 1000) 
+        }, { status: 500 });
+      }
     }
 
     console.log('FINAL STRUCTURED JSON:', JSON.stringify(finalAnalysisJson, null, 2));
@@ -896,6 +918,7 @@ export async function GET() {
     message: 'VeoGrowth Campaign Generator API - Claude 4 Sonnet Powered', 
     status: 'operational',
     model: 'claude-sonnet-4-20250514',
-    features: ['web_search', 'thinking']
+    features: ['web_search', 'thinking'],
+    mock_mode: USE_MOCK_DATA ? 'ENABLED' : 'DISABLED'
   });
 }
