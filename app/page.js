@@ -18,6 +18,7 @@ export default function CampaignGeneratorPage() {
   const useAnimatedCounter = (end, duration = 1000, startOnMount = false) => {
     const [count, setCount] = useState(0);
     const [hasStarted, setHasStarted] = useState(false);
+    const [isComplete, setIsComplete] = useState(false);
     const countRef = React.useRef(null);
     const observerRef = React.useRef(null);
 
@@ -30,48 +31,7 @@ export default function CampaignGeneratorPage() {
           (entries) => {
             if (entries[0].isIntersecting && !hasStarted) {
               startCounting();
-            @keyframes numberGlow {
-            0% {
-              text-shadow: 0 0 10px rgba(59, 130, 246, 0);
-            .glass-card:hover {
-            background: rgba(255, 255, 255, 0.15);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-          @keyframes successPulse {
-            0% {
-              box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
             }
-            70% {
-              box-shadow: 0 0 0 10px rgba(34, 197, 94, 0);
-            }
-            100% {
-              box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
-            }
-          }
-          .success-pulse {
-            animation: successPulse 0.7s ease-out;
-          }
-          .glass-card-dark:hover {
-            background: rgba(0, 0, 0, 0.3);
-            border-color: rgba(255, 255, 255, 0.2);
-          }
-          .hover-lift {
-            transition: all 0.3s ease;
-          }
-          .hover-lift:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
-          }
-            50% {
-              text-shadow: 0 0 20px rgba(59, 130, 246, 0.8), 0 0 30px rgba(59, 130, 246, 0.6);
-            }
-            100% {
-              text-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
-            }
-          }
-          .number-glow {
-            animation: numberGlow 0.6s ease-out;
-          }
           },
           { threshold: 0.5 }
         );
@@ -103,13 +63,14 @@ export default function CampaignGeneratorPage() {
           requestAnimationFrame(step);
         } else {
           setCount(end);
+          setIsComplete(true);
         }
       };
       
       requestAnimationFrame(step);
     };
 
-    return { count, ref: countRef };
+    return { count, ref: countRef, isComplete };
   };
 
   const copyToClipboard = (text, index) => {
@@ -274,6 +235,28 @@ export default function CampaignGeneratorPage() {
               box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
             }
           }
+          @keyframes numberGlow {
+            0% {
+              text-shadow: 0 0 10px rgba(59, 130, 246, 0);
+            }
+            50% {
+              text-shadow: 0 0 20px rgba(59, 130, 246, 0.8), 0 0 30px rgba(59, 130, 246, 0.6);
+            }
+            100% {
+              text-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+            }
+          }
+          @keyframes successPulse {
+            0% {
+              box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+            }
+            70% {
+              box-shadow: 0 0 0 10px rgba(34, 197, 94, 0);
+            }
+            100% {
+              box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+            }
+          }
           .animate-slide-in-top {
             animation: slideInFromTop 0.6s ease-out forwards;
           }
@@ -296,11 +279,21 @@ export default function CampaignGeneratorPage() {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+          }
+          .glass-card:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
           }
           .glass-card-dark {
             background: rgba(0, 0, 0, 0.2);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.1);
+          }
+          .glass-card-dark:hover {
+            background: rgba(0, 0, 0, 0.3);
+            border-color: rgba(255, 255, 255, 0.2);
           }
           .email-preview {
             background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%);
@@ -323,6 +316,19 @@ export default function CampaignGeneratorPage() {
             right: 0;
             height: 2px;
             background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
+          }
+          .hover-lift {
+            transition: all 0.3s ease;
+          }
+          .hover-lift:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+          }
+          .number-glow {
+            animation: numberGlow 0.6s ease-out;
+          }
+          .success-pulse {
+            animation: successPulse 0.7s ease-out;
           }
         `}} />
 
@@ -475,7 +481,7 @@ export default function CampaignGeneratorPage() {
                 <span className="text-sm text-green-400 uppercase tracking-wide font-bold block mb-4">Key Characteristics</span>
                 <div className="space-y-3">
                   {analysisData.analysis.idealCustomerProfile.keyCharacteristics.map((char, index) => (
-                    <div key={index} className="flex items-start bg-gray-800/30 rounded-lg p-4 border border-gray-700/50 hover:bg-gray-800/50 hover:border-gray-600/50 transition-all cursor-pointer">
+                    <div key={index} className="flex items-start bg-gray-800/30 rounded-lg p-4 border border-gray-700/50 hover:bg-gray-800/50 hover:border-gray-600/50 transition-all cursor-pointer hover-lift">
                       <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
                         {index === 0 && (
                           <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -524,11 +530,11 @@ export default function CampaignGeneratorPage() {
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {analysisData.analysis.keyPersonas.map((persona, index) => (
-                  <div key={index} className="bg-gray-800/40 backdrop-blur border border-gray-700 rounded-xl p-6 hover:bg-gray-800/60 transition-all">
+                  <div key={index} className="bg-gray-800/40 backdrop-blur border border-gray-700 rounded-xl p-6 hover:bg-gray-800/60 transition-all hover-lift">
                     <div className="w-14 h-14 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
                       {persona.title.toLowerCase().includes('ceo') || persona.title.toLowerCase().includes('founder') ? (
                         <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                         </svg>
                       ) : persona.title.toLowerCase().includes('vp') || persona.title.toLowerCase().includes('director') ? (
                         <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
