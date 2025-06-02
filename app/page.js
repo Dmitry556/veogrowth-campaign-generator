@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+// Note: html2pdf is loaded dynamically from CDN, not imported as a module
 import html2pdf from 'html2pdf.js';
 
 // Animated counter hook - MUST be defined outside the component
@@ -102,18 +103,32 @@ export default function CampaignGeneratorPage() {
     setDownloadingPDF(true);
 
     try {
-      // Load html2pdf dynamically
-      if (!window.html2pdf) {
+      // Create a simple fallback if html2pdf isn't available
+      const element = contentRef.current;
+      
+      // Check if html2pdf is already loaded
+      if (typeof window !== 'undefined' && !window.html2pdf) {
+        // Dynamically create and load the script
         const script = document.createElement('script');
         script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+        script.async = true;
+        
+        // Wait for script to load
         await new Promise((resolve, reject) => {
           script.onload = resolve;
-          script.onerror = reject;
+          script.onerror = () => reject(new Error('Failed to load PDF library'));
           document.head.appendChild(script);
         });
+        
+        // Give it a moment to initialize
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
 
-      const element = contentRef.current;
+      // Check again if html2pdf is available
+      if (typeof window.html2pdf === 'undefined') {
+        throw new Error('PDF library not available');
+      }
+
       const opt = {
         margin: 10,
         filename: `VeoGrowth_Analysis_${analysisData.companyName}_${new Date().toISOString().split('T')[0]}.pdf`,
@@ -146,13 +161,13 @@ export default function CampaignGeneratorPage() {
 
       // Show hidden elements again
       noExportElements.forEach(el => el.style.display = '');
-
-      // Optional: Send notification
-      // alert('PDF downloaded successfully!');
       
     } catch (error) {
       console.error('PDF generation failed:', error);
-      alert('Failed to generate PDF. Please try again.');
+      // Fallback to print dialog if PDF generation fails
+      if (window.confirm('PDF generation failed. Would you like to use the print dialog instead?')) {
+        window.print();
+      }
     } finally {
       setDownloadingPDF(false);
     }
