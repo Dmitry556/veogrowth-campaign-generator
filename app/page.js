@@ -101,99 +101,56 @@ export default function CampaignGeneratorPage() {
     setDownloadingPDF(true);
 
     try {
-      // Create a simple fallback if html2pdf isn't available
-      const element = contentRef.current;
-      
       // Check if html2pdf is already loaded
       if (typeof window !== 'undefined' && !window.html2pdf) {
+        console.log('Loading html2pdf library...');
         // Dynamically create and load the script
         const script = document.createElement('script');
         script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-        script.async = true;
         
         // Wait for script to load
         await new Promise((resolve, reject) => {
-          script.onload = resolve;
-          script.onerror = () => reject(new Error('Failed to load PDF library'));
+          script.onload = () => {
+            console.log('html2pdf library loaded successfully');
+            resolve();
+          };
+          script.onerror = () => {
+            console.error('Failed to load html2pdf library');
+            reject(new Error('Failed to load PDF library'));
+          };
           document.head.appendChild(script);
         });
         
         // Give it a moment to initialize
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      // Check again if html2pdf is available
+      // Check if html2pdf is available
       if (typeof window.html2pdf === 'undefined') {
-        throw new Error('PDF library not available');
+        throw new Error('PDF library not available after loading');
       }
 
-      // Clone the element to modify it for PDF
-      const clonedElement = element.cloneNode(true);
+      console.log('Starting PDF generation...');
+      const element = contentRef.current;
       
-      // Apply PDF-specific styles to the clone
-      clonedElement.style.backgroundColor = '#0f172a';
-      clonedElement.style.padding = '20px';
-      
-      // Fix all glass cards to have solid backgrounds
-      const glassCards = clonedElement.querySelectorAll('.glass-card, .glass-card-dark');
-      glassCards.forEach(card => {
-        card.style.backgroundColor = 'rgba(30, 41, 59, 0.9)';
-        card.style.backdropFilter = 'none';
-        card.style.border = '1px solid rgba(71, 85, 105, 1)';
-      });
-
-      // Fix text colors
-      const allText = clonedElement.querySelectorAll('p, span, h1, h2, h3, h4, h5, h6, div, li');
-      allText.forEach(el => {
-        if (el.style.color === '' || el.style.color === 'inherit') {
-          const computedStyle = window.getComputedStyle(el);
-          if (computedStyle.color === 'rgb(255, 255, 255)' || computedStyle.color === 'white') {
-            el.style.color = '#ffffff';
-          }
-        }
-      });
-
-      // Fix email preview sections
-      const emailPreviews = clonedElement.querySelectorAll('.email-preview');
-      emailPreviews.forEach(preview => {
-        preview.style.backgroundColor = '#1a1a1a';
-        preview.style.border = '1px solid #374151';
-      });
-
-      // Remove animations
-      const animated = clonedElement.querySelectorAll('[class*="animate-"]');
-      animated.forEach(el => {
-        el.className = el.className.replace(/animate-\S+/g, '');
-      });
-
-      // Hide elements that shouldn't be in PDF
-      const noExportElements = clonedElement.querySelectorAll('.no-export, .no-print');
-      noExportElements.forEach(el => el.style.display = 'none');
-
-      // Append clone to body temporarily
-      clonedElement.style.position = 'absolute';
-      clonedElement.style.left = '-9999px';
-      clonedElement.style.width = '1200px';
-      document.body.appendChild(clonedElement);
-
+      // Simple options first
       const opt = {
-        margin: 10,
+        margin: [10, 10, 10, 10],
         filename: `VeoGrowth_Analysis_${analysisData.companyName}_${new Date().toISOString().split('T')[0]}.pdf`,
         image: { 
           type: 'jpeg', 
-          quality: 1 
+          quality: 0.98 
         },
         html2canvas: { 
-          scale: 2,
+          scale: 1.5,
           useCORS: true,
-          logging: false,
+          logging: true, // Enable logging to see what's happening
           backgroundColor: '#0f172a',
-          onclone: function(clonedDoc) {
-            // Additional fixes in the cloned document
-            const clonedElement = clonedDoc.querySelector('[data-pdf-content]');
-            if (clonedElement) {
-              clonedElement.style.backgroundColor = '#0f172a';
-            }
+          windowWidth: 1200,
+          scrollY: -window.scrollY, // Ensure we capture from top
+          ignoreElements: (element) => {
+            // Ignore elements with no-export class
+            return element.classList && (element.classList.contains('no-export') || element.classList.contains('no-print'));
           }
         },
         jsPDF: { 
@@ -203,25 +160,49 @@ export default function CampaignGeneratorPage() {
         },
         pagebreak: { 
           mode: 'css',
-          before: '.page-break-before',
-          after: '.page-break-after',
-          avoid: 'img, .glass-card, .email-preview'
+          before: '.page-break',
+          avoid: ['img', '.glass-card', '.email-preview']
         }
       };
 
-      // Add identifier to cloned element
-      clonedElement.setAttribute('data-pdf-content', 'true');
+      // Hide no-export elements before generating
+      const noExportElements = element.querySelectorAll('.no-export, .no-print');
+      noExportElements.forEach(el => {
+        el.style.setProperty('display', 'none', 'important');
+      });
 
-      // Generate and download PDF from clone
-      await window.html2pdf().set(opt).from(clonedElement).save();
+      // Generate PDF
+      console.log('Generating PDF with options:', opt);
+      await window.html2pdf()
+        .set(opt)
+        .from(element)
+        .save()
+        .catch(err => {
+          console.error('html2pdf error:', err);
+          throw err;
+        });
 
-      // Remove clone
-      document.body.removeChild(clonedElement);
+      console.log('PDF generated successfully');
+
+      // Restore hidden elements
+      noExportElements.forEach(el => {
+        el.style.removeProperty('display');
+      });
       
     } catch (error) {
       console.error('PDF generation failed:', error);
-      // Fallback to print dialog if PDF generation fails
-      if (window.confirm('PDF generation failed. Would you like to use the print dialog instead?')) {
+      console.error('Error details:', error.message, error.stack);
+      
+      // More specific error message
+      let errorMessage = 'PDF generation failed. ';
+      if (error.message.includes('library')) {
+        errorMessage += 'Could not load PDF library. ';
+      } else if (error.message.includes('canvas')) {
+        errorMessage += 'Error rendering the page. ';
+      }
+      errorMessage += 'Would you like to use the print dialog instead?';
+      
+      if (window.confirm(errorMessage)) {
         window.print();
       }
     } finally {
@@ -302,11 +283,30 @@ export default function CampaignGeneratorPage() {
         {/* Print styles and animations */}
         <style dangerouslySetInnerHTML={{ __html: `
           @media print {
-            .no-print {
+            .no-print, .no-export {
               display: none !important;
             }
             .print-break-inside-avoid {
               break-inside: avoid;
+            }
+            /* Dark theme for print */
+            body {
+              background-color: #0f172a !important;
+              color: white !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              color-adjust: exact !important;
+            }
+            .glass-card, .glass-card-dark {
+              background-color: rgba(30, 41, 59, 0.9) !important;
+              border: 1px solid rgba(71, 85, 105, 1) !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            * {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              color-adjust: exact !important;
             }
           }
           @keyframes slideInFromTop {
@@ -517,28 +517,39 @@ export default function CampaignGeneratorPage() {
                   <div className="text-gray-300">
                     <span className="text-gray-400">Status:</span> <span className="text-green-400 font-medium">Verified</span>
                   </div>
-                  <button
-                    onClick={downloadPDF}
-                    disabled={downloadingPDF}
-                    className="text-gray-400 hover:text-white transition-colors no-print no-export flex items-center space-x-2"
-                  >
-                    {downloadingPDF ? (
-                      <>
-                        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                        <span className="text-sm">Generating...</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        <span className="text-sm">Download PDF</span>
-                      </>
-                    )}
-                  </button>
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={downloadPDF}
+                      disabled={downloadingPDF}
+                      className="text-gray-400 hover:text-white transition-colors no-print no-export flex items-center space-x-2"
+                    >
+                      {downloadingPDF ? (
+                        <>
+                          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          <span className="text-sm">Generating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <span className="text-sm">Download PDF</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => window.print()}
+                      className="text-gray-400 hover:text-white transition-colors no-print no-export flex items-center space-x-2"
+                      title="Use browser's print dialog (Ctrl+P)"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
