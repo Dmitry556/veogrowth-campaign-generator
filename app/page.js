@@ -396,10 +396,10 @@ export default function CampaignGeneratorPage() {
             </div>
           </div>
 
-          {/* Hero Insight Section - Smaller since positioning moved */}
-          <div className="mb-4 animate-slide-in-top" style={{ animationDelay: '0.1s' }}>
-            <div className="glass-card rounded-xl p-4 text-center">
-              <p className="text-base text-white max-w-2xl mx-auto">
+          {/* Hero Insight Section - Made larger and more prominent */}
+          <div className="mb-6 animate-slide-in-top" style={{ animationDelay: '0.1s' }}>
+            <div className="glass-card rounded-xl p-6 text-center">
+              <p className="text-lg text-white max-w-3xl mx-auto leading-relaxed">
                 {analysisData.analysis.positioningAssessmentOutput.split(':')[1]?.trim() || ''}
               </p>
             </div>
@@ -419,17 +419,17 @@ export default function CampaignGeneratorPage() {
               </div>
               <div className="text-base text-white mt-2">Key Personas</div>
             </div>
-            <div className="glass-card p-6 rounded-xl text-center animate-slide-in-right md:col-span-2 bg-gradient-to-br from-green-500/10 to-blue-500/10 border-2 border-green-400/30" style={{ animationDelay: '0.4s' }}>
-              <div className="flex items-center justify-center space-x-4">
+            <div className="glass-card p-5 rounded-xl text-center animate-slide-in-right md:col-span-2 bg-gradient-to-br from-green-500/10 to-blue-500/10 border-2 border-green-400/30" style={{ animationDelay: '0.4s' }}>
+              <div className="flex items-center justify-center space-x-3">
                 <div className="text-center">
-                  <div ref={prospectCounter.ref} className={`text-5xl font-bold text-green-400 ${prospectCounter.isComplete ? 'number-glow' : ''}`}>
+                  <div ref={prospectCounter.ref} className={`text-4xl font-bold text-green-400 ${prospectCounter.isComplete ? 'number-glow' : ''}`}>
                     {prospectCounter.count > 0 ? prospectCounter.count.toLocaleString() : '0'}
                   </div>
-                  <div className="text-lg text-white mt-2 font-semibold">Target Prospects Identified</div>
-                  <div className="text-sm text-gray-300 mt-1">Ready to be contacted</div>
+                  <div className="text-base text-white mt-1 font-semibold">Target Prospects Identified</div>
+                  <div className="text-xs text-gray-300">Ready to be contacted</div>
                 </div>
                 <div className="hidden md:block">
-                  <svg className="w-20 h-20 text-green-400/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-16 h-16 text-green-400/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                   </svg>
                 </div>
@@ -462,22 +462,22 @@ export default function CampaignGeneratorPage() {
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-blue-500/10 border border-blue-400/30 rounded-xl p-5 hover-lift cursor-pointer">
-                  <span className="text-sm text-blue-400 uppercase tracking-wide font-bold block mb-2">Industry Focus</span>
+                <div className="bg-blue-500/10 border border-blue-400/30 rounded-xl p-4 hover-lift cursor-pointer">
+                  <span className="text-xs text-blue-400 uppercase tracking-wide font-bold block mb-1">Industry Focus</span>
                   <div className="flex items-center space-x-2">
-                    <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
-                    <p className="text-white text-lg font-medium">{analysisData.analysis.idealCustomerProfile.industry}</p>
+                    <p className="text-white text-base font-medium">{analysisData.analysis.idealCustomerProfile.industry}</p>
                   </div>
                 </div>
-                <div className="bg-purple-500/10 border border-purple-400/30 rounded-xl p-5 hover-lift cursor-pointer">
-                  <span className="text-sm text-purple-400 uppercase tracking-wide font-bold block mb-2">Company Size</span>
+                <div className="bg-purple-500/10 border border-purple-400/30 rounded-xl p-4 hover-lift cursor-pointer">
+                  <span className="text-xs text-purple-400 uppercase tracking-wide font-bold block mb-1">Company Size</span>
                   <div className="flex items-center space-x-2">
-                    <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
-                    <p className="text-white text-lg font-medium">{analysisData.analysis.idealCustomerProfile.companySize}</p>
+                    <p className="text-white text-base font-medium">{analysisData.analysis.idealCustomerProfile.companySize}</p>
                   </div>
                 </div>
               </div>
@@ -535,38 +535,38 @@ export default function CampaignGeneratorPage() {
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {analysisData.analysis.keyPersonas.map((persona, index) => (
-                  <div key={index} className="bg-gray-800/40 backdrop-blur border border-gray-700 rounded-xl p-6 hover:bg-gray-800/60 transition-all hover-lift">
-                    <div className="w-14 h-14 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <div key={index} className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur border border-gray-600 rounded-xl p-6 hover:from-gray-800/70 hover:to-gray-900/70 transition-all hover-lift">
+                    <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-5 shadow-xl">
                       {persona.title.toLowerCase().includes('ceo') || persona.title.toLowerCase().includes('founder') ? (
-                        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-9 h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                         </svg>
                       ) : persona.title.toLowerCase().includes('vp') || persona.title.toLowerCase().includes('director') ? (
-                        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-9 h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
                       ) : persona.title.toLowerCase().includes('manager') ? (
-                        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-9 h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                       ) : persona.title.toLowerCase().includes('head') || persona.title.toLowerCase().includes('lead') ? (
-                        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-9 h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                         </svg>
                       ) : (
-                        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-9 h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                         </svg>
                       )}
                     </div>
-                    <h4 className="font-bold text-white text-xl text-center mb-4">{persona.title}</h4>
-                    <div className="bg-black/30 rounded-lg p-4">
-                      <p className="text-sm text-purple-300 font-semibold uppercase tracking-wide mb-3">Pain Points:</p>
+                    <h4 className="font-bold text-white text-xl text-center mb-5">{persona.title}</h4>
+                    <div className="bg-gradient-to-br from-purple-600/10 to-pink-600/10 border border-purple-400/20 rounded-xl p-5">
+                      <p className="text-xs text-purple-300 font-bold uppercase tracking-wider mb-4">Pain Points:</p>
                       <ul className="space-y-3">
                         {persona.painPoints.split(', ').map((pain, painIndex) => (
                           <li key={painIndex} className="flex items-start">
-                            <div className="w-2 h-2 bg-purple-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-                            <span className="text-white text-lg leading-relaxed">{pain}</span>
+                            <div className="w-2 h-2 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full mt-2 mr-3 flex-shrink-0 shadow-sm"></div>
+                            <span className="text-white text-base leading-relaxed">{pain}</span>
                           </li>
                         ))}
                       </ul>
@@ -723,17 +723,30 @@ export default function CampaignGeneratorPage() {
               </div>
             )}
             
-            {/* Prospect Targeting Note - Much more prominent */}
-            <div className="bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border-2 border-blue-500/30 rounded-2xl p-10 animate-fade-in" style={{ animationDelay: '1s' }}>
-              <div className="space-y-6">
-                <div className="bg-black/20 rounded-xl p-6">
+            {/* Prospect Targeting Note - Much more prominent with better design */}
+            <div className="bg-gradient-to-r from-blue-600/30 to-indigo-600/30 border-2 border-blue-400/50 rounded-2xl p-8 animate-fade-in shadow-xl" style={{ animationDelay: '1s' }}>
+              <div className="space-y-8">
+                <div className="bg-gradient-to-br from-blue-900/60 to-indigo-900/60 rounded-xl p-8 border border-blue-400/30">
+                  <div className="flex items-center mb-4">
+                    <svg className="w-8 h-8 text-blue-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <h3 className="text-2xl font-bold text-white">Ready to Launch?</h3>
+                  </div>
                   <p className="text-xl text-white font-medium leading-relaxed">
                     {analysisData.analysis.veoGrowthPitch}
                   </p>
                 </div>
-                <p className="text-lg text-gray-100 italic leading-relaxed">
-                  {analysisData.analysis.prospectTargetingNote}
-                </p>
+                <div className="bg-black/30 rounded-xl p-6 border border-gray-600">
+                  <div className="flex items-start">
+                    <svg className="w-6 h-6 text-green-400 mr-3 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-lg text-gray-100 leading-relaxed">
+                      <span className="font-bold text-white">Target Audience Size:</span> {analysisData.analysis.prospectTargetingNote}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
