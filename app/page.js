@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 
-// Animated counter hook - MUST be defined outside the component
+// Animated counter hook -- MUST be defined outside the component
 function useAnimatedCounter(end, duration = 1000, startOnMount = false) {
   const [count, setCount] = useState(0);
   const [hasStarted, setHasStarted] = useState(false);
