@@ -89,6 +89,300 @@ export default function CampaignGeneratorPage() {
   const personaCounter = useAnimatedCounter(submitted ? 3 : 0, 800);
   const prospectCounter = useAnimatedCounter(submitted ? prospectCount : 0, 1200);
 
+  const exportToPDF = async () => {
+    // Create a hidden iframe
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.top = '-10000px';
+    document.body.appendChild(iframe);
+
+    // Get the content to print
+    const content = document.querySelector('.pdf-content');
+    if (!content) return;
+
+    // Clone the content
+    const clonedContent = content.cloneNode(true);
+    
+    // Remove no-print elements from clone
+    clonedContent.querySelectorAll('.no-print').forEach(el => el.remove());
+
+    // Create the PDF document structure
+    const pdfDocument = iframe.contentDocument || iframe.contentWindow.document;
+    pdfDocument.open();
+    pdfDocument.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>VeoGrowth Analysis - ${analysisData.companyName}</title>
+          <meta charset="utf-8">
+          <style>
+            /* PDF specific styles */
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              color: #1f2937;
+              background: white;
+              padding: 20px;
+              font-size: 14px;
+              line-height: 1.6;
+            }
+            
+            /* Header styles */
+            .header { 
+              background: #1e293b;
+              color: white;
+              padding: 20px;
+              border-radius: 8px;
+              margin-bottom: 20px;
+            }
+            .header h1 { font-size: 24px; margin-bottom: 5px; }
+            .header p { font-size: 14px; opacity: 0.9; }
+            
+            /* Stats grid */
+            .stats-grid {
+              display: grid;
+              grid-template-columns: repeat(3, 1fr);
+              gap: 15px;
+              margin-bottom: 20px;
+            }
+            .stat-card {
+              background: #f1f5f9;
+              padding: 15px;
+              border-radius: 8px;
+              text-align: center;
+              border: 1px solid #e2e8f0;
+            }
+            .stat-number { 
+              font-size: 28px; 
+              font-weight: bold; 
+              color: #3b82f6;
+              margin-bottom: 5px;
+            }
+            .stat-label { 
+              font-size: 14px;
+              color: #475569;
+            }
+            
+            /* Section styles */
+            .section {
+              margin-bottom: 25px;
+              page-break-inside: avoid;
+            }
+            .section-title {
+              font-size: 20px;
+              font-weight: bold;
+              color: #1e293b;
+              margin-bottom: 15px;
+              padding-bottom: 8px;
+              border-bottom: 2px solid #e2e8f0;
+            }
+            
+            /* ICP styles */
+            .icp-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 15px;
+              margin-bottom: 15px;
+            }
+            .icp-box {
+              background: #eff6ff;
+              padding: 15px;
+              border-radius: 6px;
+              border: 1px solid #3b82f6;
+            }
+            .icp-label {
+              font-size: 12px;
+              color: #3b82f6;
+              font-weight: bold;
+              text-transform: uppercase;
+              margin-bottom: 5px;
+            }
+            
+            /* Characteristics */
+            .characteristic {
+              background: #f9fafb;
+              padding: 12px;
+              margin-bottom: 8px;
+              border-radius: 6px;
+              border-left: 3px solid #10b981;
+            }
+            
+            /* Personas */
+            .personas-grid {
+              display: grid;
+              grid-template-columns: repeat(3, 1fr);
+              gap: 15px;
+            }
+            .persona-card {
+              background: #faf5ff;
+              border: 1px solid #a855f7;
+              border-radius: 8px;
+              padding: 15px;
+              page-break-inside: avoid;
+            }
+            .persona-title {
+              font-size: 16px;
+              font-weight: bold;
+              color: #6b21a8;
+              margin-bottom: 10px;
+              text-align: center;
+            }
+            .pain-point {
+              font-size: 13px;
+              margin-bottom: 8px;
+              padding-left: 15px;
+              position: relative;
+            }
+            .pain-point:before {
+              content: "•";
+              position: absolute;
+              left: 0;
+              color: #a855f7;
+            }
+            
+            /* Campaign styles */
+            .campaign {
+              margin-bottom: 20px;
+              page-break-inside: avoid;
+            }
+            .campaign-name {
+              font-size: 18px;
+              font-weight: bold;
+              color: #059669;
+              margin-bottom: 8px;
+            }
+            .campaign-target {
+              background: #d1fae5;
+              padding: 12px;
+              border-radius: 6px;
+              margin-bottom: 10px;
+              font-size: 14px;
+            }
+            .email-preview {
+              background: #f3f4f6;
+              border: 1px solid #d1d5db;
+              border-radius: 6px;
+              padding: 15px;
+              font-family: monospace;
+              font-size: 13px;
+              white-space: pre-wrap;
+            }
+            
+            /* Footer */
+            .footer {
+              margin-top: 30px;
+              padding-top: 20px;
+              border-top: 2px solid #e2e8f0;
+              text-align: center;
+              font-size: 12px;
+              color: #6b7280;
+            }
+            
+            @media print {
+              body { padding: 0; }
+              .section { page-break-inside: avoid; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>AI Campaign Analysis for ${analysisData.companyName}</h1>
+            <p>Generated by VeoGrowth - ${new Date().toLocaleDateString()}</p>
+          </div>
+          
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-number">3</div>
+              <div class="stat-label">Campaign Ideas</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-number">3</div>
+              <div class="stat-label">Key Personas</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-number">${prospectCount.toLocaleString()}</div>
+              <div class="stat-label">Target Prospects</div>
+            </div>
+          </div>
+          
+          <div class="section">
+            <h2 class="section-title">Positioning Assessment</h2>
+            <p>${analysisData.analysis.positioningAssessmentOutput}</p>
+          </div>
+          
+          <div class="section">
+            <h2 class="section-title">Ideal Customer Profile</h2>
+            <div class="icp-grid">
+              <div class="icp-box">
+                <div class="icp-label">Industry Focus</div>
+                <div>${analysisData.analysis.idealCustomerProfile.industry}</div>
+              </div>
+              <div class="icp-box">
+                <div class="icp-label">Company Size</div>
+                <div>${analysisData.analysis.idealCustomerProfile.companySize}</div>
+              </div>
+            </div>
+            <h3 style="font-size: 16px; margin: 15px 0 10px;">Key Characteristics:</h3>
+            ${analysisData.analysis.idealCustomerProfile.keyCharacteristics.map(char => 
+              `<div class="characteristic">${char}</div>`
+            ).join('')}
+          </div>
+          
+          <div class="section">
+            <h2 class="section-title">Key Personas</h2>
+            <div class="personas-grid">
+              ${analysisData.analysis.keyPersonas.map(persona => `
+                <div class="persona-card">
+                  <h3 class="persona-title">${persona.title}</h3>
+                  <div style="font-size: 12px; color: #6b21a8; font-weight: bold; margin-bottom: 8px;">PAIN POINTS:</div>
+                  ${persona.painPoints.split(', ').map(pain => 
+                    `<div class="pain-point">${pain}</div>`
+                  ).join('')}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          
+          <div class="section">
+            <h2 class="section-title">Campaign Ideas</h2>
+            ${analysisData.analysis.campaignIdeas.map((campaign, index) => `
+              <div class="campaign">
+                <h3 class="campaign-name">${index + 1}. ${campaign.name}</h3>
+                <div class="campaign-target">
+                  <strong>Target:</strong> ${campaign.target}
+                </div>
+                <div class="email-preview">${campaign.emailBody}</div>
+              </div>
+            `).join('')}
+          </div>
+          
+          <div class="section">
+            <h2 class="section-title">Next Steps</h2>
+            <p style="font-size: 16px; margin-bottom: 10px;">${analysisData.analysis.veoGrowthPitch}</p>
+            <p style="font-style: italic; color: #6b7280;">${analysisData.analysis.prospectTargetingNote}</p>
+          </div>
+          
+          <div class="footer">
+            <p>© ${new Date().getFullYear()} VeoGrowth - AI-Powered B2B Lead Generation</p>
+            <p>Visit veogrowth.com to execute these campaigns</p>
+          </div>
+        </body>
+      </html>
+    `);
+    pdfDocument.close();
+
+    // Wait for content to load
+    setTimeout(() => {
+      // Trigger print dialog (will show save as PDF option)
+      iframe.contentWindow.print();
+      
+      // Clean up after a delay
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 1000);
+    }, 500);
+  };
+
   const copyToClipboard = (text, index) => {
     navigator.clipboard.writeText(text);
     setCopiedIndex(index);
@@ -344,7 +638,7 @@ export default function CampaignGeneratorPage() {
           <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-indigo-500 rounded-full mix-blend-screen filter blur-3xl opacity-5 animate-pulse" style={{ animationDelay: '4s' }}></div>
         </div>
 
-        <div className="relative max-w-7xl mx-auto px-4 py-8">
+        <div className="relative max-w-7xl mx-auto px-4 py-8 pdf-content">
           {/* AI Status Header with Logo */}
           <div className="mb-8 animate-slide-in-top">
             <div className="glass-card-dark rounded-2xl p-6">
@@ -384,12 +678,14 @@ export default function CampaignGeneratorPage() {
                     <span className="text-gray-400">Status:</span> <span className="text-green-400 font-medium">Verified</span>
                   </div>
                   <button
-                    onClick={() => window.print()}
-                    className="text-gray-400 hover:text-white transition-colors no-print"
+                    onClick={exportToPDF}
+                    className="text-gray-400 hover:text-white transition-colors no-print flex items-center space-x-2"
+                    title="Download PDF"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
+                    <span className="text-sm">PDF</span>
                   </button>
                 </div>
               </div>
@@ -776,27 +1072,39 @@ export default function CampaignGeneratorPage() {
           {/* Divider */}
           <div className="border-t border-gray-700 my-8 no-print"></div>
 
-          {/* Generate Another + Contact */}
+          {/* Generate Another + Download PDF + Contact */}
           <div className="text-center space-y-4 no-print animate-fade-in" style={{ animationDelay: '1.2s' }}>
-            <button
-              onClick={() => {
-                setSubmitted(false);
-                setEmail('');
-                setWebsite('');
-                setPositioning('');
-                setAnalysisData(null);
-                setCopiedIndex(null);
-                setError('');
-                setErrorDetails('');
-                setSelectedCampaign(0);
-              }}
-              className="inline-flex items-center px-6 py-3 glass-card rounded-lg hover:bg-white/20 text-white font-medium transition-all"
-            >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Generate Another Analysis
-            </button>
+            <div className="flex items-center justify-center space-x-4">
+              <button
+                onClick={() => {
+                  setSubmitted(false);
+                  setEmail('');
+                  setWebsite('');
+                  setPositioning('');
+                  setAnalysisData(null);
+                  setCopiedIndex(null);
+                  setError('');
+                  setErrorDetails('');
+                  setSelectedCampaign(0);
+                }}
+                className="inline-flex items-center px-6 py-3 glass-card rounded-lg hover:bg-white/20 text-white font-medium transition-all"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Generate Another Analysis
+              </button>
+              
+              <button
+                onClick={exportToPDF}
+                className="inline-flex items-center px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg text-white font-medium transition-all"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Download PDF Report
+              </button>
+            </div>
             
             <p className="text-gray-400 text-sm">
               Questions? Email me at{' '}
