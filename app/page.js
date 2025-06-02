@@ -1,8 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-// Note: html2pdf is loaded dynamically from CDN, not imported as a module
-import html2pdf from 'html2pdf.js';
 
 // Animated counter hook - MUST be defined outside the component
 function useAnimatedCounter(end, duration = 1000, startOnMount = false) {
@@ -138,7 +136,7 @@ export default function CampaignGeneratorPage() {
           useCORS: true,
           logging: false,
           letterRendering: true,
-          backgroundColor: '#0f172a' // Match the dark background
+          backgroundColor: '#0f172a'
         },
         jsPDF: { 
           unit: 'mm', 
