@@ -272,17 +272,17 @@ export default function CampaignGeneratorPage() {
             </div>
           </div>
 
-          {/* Hero Insight Section - Smaller and cleaner */}
+          {/* Hero Insight Section - Better contrast */}
           <div className="mb-6 animate-slide-in-top" style={{ animationDelay: '0.1s' }}>
             <div className="glass-card rounded-xl p-6 text-center">
               <h3 className="text-xl font-semibold text-white mb-2">
                 {analysisData.analysis.positioningAssessmentOutput.split(':')[0].replace('✅', '').replace('❌', '').replace('⚠️', '').trim()}
               </h3>
-              <p className="text-base text-gray-200 max-w-2xl mx-auto">
+              <p className="text-base text-white max-w-2xl mx-auto">
                 {analysisData.analysis.positioningAssessmentOutput.split(':')[1]?.trim() || ''}
               </p>
               <div className="mt-4 inline-flex items-center space-x-2 text-sm">
-                <span className="text-gray-400">Confidence:</span>
+                <span className="text-gray-300">Confidence:</span>
                 <div className="flex items-center">
                   <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">
                     <div className="h-full bg-gradient-to-r from-blue-500 to-green-500 rounded-full" style={{ width: '94%' }}></div>
@@ -346,16 +346,16 @@ export default function CampaignGeneratorPage() {
                 <span className="text-sm text-green-400 uppercase tracking-wide font-bold block mb-4">Key Characteristics</span>
                 <div className="space-y-3">
                   {analysisData.analysis.idealCustomerProfile.keyCharacteristics.map((char, index) => (
-                    <div key={index} className="flex items-start bg-gray-800/30 rounded-lg p-3 border border-gray-700/50">
-                      <div className="w-2 h-2 bg-green-400 rounded-full mt-1.5 mr-3 flex-shrink-0"></div>
-                      <span className="text-white text-base leading-relaxed">{char}</span>
+                    <div key={index} className="flex items-start bg-gray-800/30 rounded-lg p-4 border border-gray-700/50">
+                      <div className="w-2 h-2 bg-green-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                      <span className="text-white text-lg leading-relaxed">{char}</span>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
 
-            {/* Key Personas - Much better readability */}
+            {/* Key Personas - 3 columns with bullet points */}
             <div className="glass-card rounded-2xl p-8 animate-fade-in" style={{ animationDelay: '0.7s' }}>
               <div className="flex items-center mb-6">
                 <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-600 rounded-lg flex items-center justify-center mr-4">
@@ -366,22 +366,25 @@ export default function CampaignGeneratorPage() {
                 <h3 className="text-2xl font-bold text-white">Key Personas</h3>
               </div>
               
-              <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {analysisData.analysis.keyPersonas.map((persona, index) => (
                   <div key={index} className="bg-gray-800/40 backdrop-blur border border-gray-700 rounded-xl p-6 hover:bg-gray-800/60 transition-all">
-                    <div className="flex items-start">
-                      <div className="w-14 h-14 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center mr-4 flex-shrink-0">
-                        <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-bold text-white text-xl mb-3">{persona.title}</h4>
-                        <div className="bg-black/30 rounded-lg p-4">
-                          <p className="text-sm text-purple-300 font-semibold uppercase tracking-wide mb-2">Pain Points:</p>
-                          <p className="text-white text-lg leading-relaxed">{persona.painPoints}</p>
-                        </div>
-                      </div>
+                    <div className="w-14 h-14 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                    <h4 className="font-bold text-white text-xl text-center mb-4">{persona.title}</h4>
+                    <div className="bg-black/30 rounded-lg p-4">
+                      <p className="text-sm text-purple-300 font-semibold uppercase tracking-wide mb-3">Pain Points:</p>
+                      <ul className="space-y-3">
+                        {persona.painPoints.split(', ').map((pain, painIndex) => (
+                          <li key={painIndex} className="flex items-start">
+                            <div className="w-2 h-2 bg-purple-400 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                            <span className="text-white text-lg leading-relaxed">{pain}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   </div>
                 ))}
