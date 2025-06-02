@@ -104,28 +104,21 @@ export default function CampaignGeneratorPage() {
       // Check if html2pdf is already loaded
       if (typeof window !== 'undefined' && !window.html2pdf) {
         console.log('Loading html2pdf library...');
-        // Dynamically create and load the script
         const script = document.createElement('script');
         script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
         
-        // Wait for script to load
         await new Promise((resolve, reject) => {
           script.onload = () => {
             console.log('html2pdf library loaded successfully');
             resolve();
           };
-          script.onerror = () => {
-            console.error('Failed to load html2pdf library');
-            reject(new Error('Failed to load PDF library'));
-          };
+          script.onerror = () => reject(new Error('Failed to load PDF library'));
           document.head.appendChild(script);
         });
         
-        // Give it a moment to initialize
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      // Check if html2pdf is available
       if (typeof window.html2pdf === 'undefined') {
         throw new Error('PDF library not available after loading');
       }
@@ -133,76 +126,68 @@ export default function CampaignGeneratorPage() {
       console.log('Starting PDF generation...');
       const element = contentRef.current;
       
-      // Simple options first
+      // Hide logo to avoid CORS issues
+      const logoElements = element.querySelectorAll('img[src*="logo.dev"], .pdf-logo, .pdf-hide-logo');
+      logoElements.forEach(el => {
+        el.style.display = 'none';
+      });
+      
+      // Hide no-export elements
+      const noExportElements = element.querySelectorAll('.no-export, .no-print');
+      noExportElements.forEach(el => {
+        el.style.display = 'none';
+      });
+
+      // Simple options to match print output
       const opt = {
-        margin: [10, 10, 10, 10],
+        margin: 5,
         filename: `VeoGrowth_Analysis_${analysisData.companyName}_${new Date().toISOString().split('T')[0]}.pdf`,
         image: { 
           type: 'jpeg', 
-          quality: 0.98 
+          quality: 1 
         },
         html2canvas: { 
-          scale: 1.5,
-          useCORS: true,
-          logging: true, // Enable logging to see what's happening
+          scale: 2,
+          useCORS: false, // Disable CORS to avoid logo issues
+          logging: false,
           backgroundColor: '#0f172a',
-          windowWidth: 1200,
-          scrollY: -window.scrollY, // Ensure we capture from top
-          ignoreElements: (element) => {
-            // Ignore elements with no-export class
-            return element.classList && (element.classList.contains('no-export') || element.classList.contains('no-print'));
-          }
+          windowWidth: element.scrollWidth,
+          scrollX: 0,
+          scrollY: -window.scrollY
         },
         jsPDF: { 
           unit: 'mm', 
           format: 'a4', 
-          orientation: 'portrait'
+          orientation: 'portrait',
+          compress: true
         },
         pagebreak: { 
-          mode: 'css',
-          before: '.page-break',
-          avoid: ['img', '.glass-card', '.email-preview']
+          mode: 'avoid-all', // No page breaks
+          before: [],
+          after: [],
+          avoid: 'img'
         }
       };
 
-      // Hide no-export elements before generating
-      const noExportElements = element.querySelectorAll('.no-export, .no-print');
-      noExportElements.forEach(el => {
-        el.style.setProperty('display', 'none', 'important');
-      });
-
-      // Generate PDF
-      console.log('Generating PDF with options:', opt);
+      console.log('Generating PDF...');
       await window.html2pdf()
         .set(opt)
         .from(element)
-        .save()
-        .catch(err => {
-          console.error('html2pdf error:', err);
-          throw err;
-        });
+        .save();
 
       console.log('PDF generated successfully');
 
       // Restore hidden elements
+      logoElements.forEach(el => {
+        el.style.display = '';
+      });
       noExportElements.forEach(el => {
-        el.style.removeProperty('display');
+        el.style.display = '';
       });
       
     } catch (error) {
       console.error('PDF generation failed:', error);
-      console.error('Error details:', error.message, error.stack);
-      
-      // More specific error message
-      let errorMessage = 'PDF generation failed. ';
-      if (error.message.includes('library')) {
-        errorMessage += 'Could not load PDF library. ';
-      } else if (error.message.includes('canvas')) {
-        errorMessage += 'Error rendering the page. ';
-      }
-      errorMessage += 'Would you like to use the print dialog instead?';
-      
-      if (window.confirm(errorMessage)) {
+      if (window.confirm('PDF generation failed. Would you like to use the print dialog instead?')) {
         window.print();
       }
     } finally {
@@ -469,6 +454,14 @@ export default function CampaignGeneratorPage() {
           .success-pulse {
             animation: successPulse 0.7s ease-out;
           }
+          /* PDF specific styles */
+          @media print {
+            body {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+              color-adjust: exact !important;
+            }
+          }
         `}} />
 
         {/* Animated background - reduced opacity */}
@@ -496,11 +489,11 @@ export default function CampaignGeneratorPage() {
                 <div className="flex items-center space-x-6 text-sm">
                   {/* Company Logo and Name */}
                   <div className="flex items-center space-x-3">
-                    <div className="relative w-12 h-12 bg-gray-800 rounded-lg overflow-hidden">
+                    <div className="relative w-12 h-12 bg-gray-800 rounded-lg overflow-hidden pdf-hide-logo">
                       <img 
                         src={`https://img.logo.dev/${analysisData.companyName}?token=${process.env.NEXT_PUBLIC_LOGO_DEV_API_KEY || 'pk_J6hzITaoQMKcQsJe6XfCHQ'}&size=96&format=png`}
                         alt={`${analysisData.companyName} logo`}
-                        className="w-full h-full object-contain"
+                        className="w-full h-full object-contain pdf-logo"
                         onError={(e) => {
                           e.target.style.display = 'none';
                           e.target.nextElementSibling.style.display = 'flex';
