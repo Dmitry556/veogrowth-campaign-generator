@@ -1,53 +1,18 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 
-export default function CampaignGeneratorPage() {
-  const [email, setEmail] = useState('');
-  const [website, setWebsite] = useState('');
-  const [positioning, setPositioning] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState('');
-  const [errorDetails, setErrorDetails] = useState('');
-  const [analysisData, setAnalysisData] = useState(null);
-  const [copiedIndex, setCopiedIndex] = useState(null);
-  const [selectedCampaign, setSelectedCampaign] = useState(0);
+// Animated counter hook - MUST be defined outside the component
+function useAnimatedCounter(end, duration = 1000, startOnMount = false) {
+  const [count, setCount] = useState(0);
+  const [hasStarted, setHasStarted] = useState(false);
+  const [isComplete, setIsComplete] = useState(false);
+  const countRef = useRef(null);
+  const observerRef = useRef(null);
 
-  // Animated counter hook
-  const useAnimatedCounter = (end, duration = 1000, startOnMount = false) => {
-    const [count, setCount] = useState(0);
-    const [hasStarted, setHasStarted] = useState(false);
-    const [isComplete, setIsComplete] = useState(false);
-    const countRef = React.useRef(null);
-    const observerRef = React.useRef(null);
-
-    React.useEffect(() => {
-      if (startOnMount) {
-        startCounting();
-      } else {
-        // Set up intersection observer
-        observerRef.current = new IntersectionObserver(
-          (entries) => {
-            if (entries[0].isIntersecting && !hasStarted) {
-              startCounting();
-            }
-          },
-          { threshold: 0.5 }
-        );
-
-        if (countRef.current) {
-          observerRef.current.observe(countRef.current);
-        }
-
-        return () => {
-          if (observerRef.current) {
-            observerRef.current.disconnect();
-          }
-        };
-      }
-    }, []);
-
+  useEffect(() => {
+    if (!end || end <= 0) return;
+    
     const startCounting = () => {
       if (hasStarted) return;
       setHasStarted(true);
@@ -70,8 +35,59 @@ export default function CampaignGeneratorPage() {
       requestAnimationFrame(step);
     };
 
-    return { count, ref: countRef, isComplete };
-  };
+    if (startOnMount) {
+      startCounting();
+    } else {
+      // Set up intersection observer
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0]?.isIntersecting && !hasStarted) {
+            startCounting();
+          }
+        },
+        { threshold: 0.5 }
+      );
+
+      if (countRef.current) {
+        observer.observe(countRef.current);
+      }
+      
+      observerRef.current = observer;
+
+      return () => {
+        if (observerRef.current) {
+          observerRef.current.disconnect();
+        }
+      };
+    }
+  }, [end, duration, hasStarted, startOnMount]);
+
+  return { count, ref: countRef, isComplete };
+}
+
+export default function CampaignGeneratorPage() {
+  const [email, setEmail] = useState('');
+  const [website, setWebsite] = useState('');
+  const [positioning, setPositioning] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState('');
+  const [errorDetails, setErrorDetails] = useState('');
+  const [analysisData, setAnalysisData] = useState(null);
+  const [copiedIndex, setCopiedIndex] = useState(null);
+  const [selectedCampaign, setSelectedCampaign] = useState(0);
+
+  // Parse prospect count for animation
+  const prospectCount = useMemo(() => {
+    if (!analysisData?.analysis?.prospectTargetingNote) return 0;
+    const prospectMatch = analysisData.analysis.prospectTargetingNote.match(/(\d+),?(\d+)?/);
+    return prospectMatch ? parseInt(prospectMatch[0].replace(/,/g, '')) : 10000;
+  }, [analysisData]);
+
+  // Initialize counters - these will only animate when displayed
+  const campaignCounter = useAnimatedCounter(submitted ? 3 : 0, 800);
+  const personaCounter = useAnimatedCounter(submitted ? 3 : 0, 800);
+  const prospectCounter = useAnimatedCounter(submitted ? prospectCount : 0, 1200);
 
   const copyToClipboard = (text, index) => {
     navigator.clipboard.writeText(text);
@@ -147,17 +163,6 @@ export default function CampaignGeneratorPage() {
   };
 
   if (submitted && analysisData) {
-    // Parse prospect count for animation
-    const prospectMatch = analysisData.analysis.prospectTargetingNote?.match(/(\d+),?(\d+)?/);
-    const prospectCount = prospectMatch 
-      ? parseInt(prospectMatch[0].replace(/,/g, ''))
-      : 10000;
-    
-    // Animated counters
-    const campaignCounter = useAnimatedCounter(3, 800);
-    const personaCounter = useAnimatedCounter(3, 800);
-    const prospectCounter = useAnimatedCounter(prospectCount, 1200);
-
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900">
         {/* Print styles and animations */}
